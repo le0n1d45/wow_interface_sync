@@ -7,6 +7,8 @@ as the GitHub release notes, so keep them readable.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-11
+
 ### Added
 - **Delete all data in the sync repo** in Settings, for a fresh start. It asks "Are you sure?" first, then removes every file (your synced settings and uploaded backups) from the repo in one commit. GitHub's history keeps the older versions, so it can be recovered from there. Nothing on your computer is touched.
 
