@@ -9,9 +9,7 @@ describe("isSyncPath", () => {
     "WTF/SavedVariables/Details.lua",
     "WTF/SavedVariables/Blizzard_AddOnList.lua",
     `${A}/SavedVariables/DBM-Core.lua`,
-    `${A}/edit-mode-cache-account.txt`,
     `${C}/SavedVariables/Details.lua`,
-    `${C}/edit-mode-cache-character.txt`,
     `${C}/AddOns.txt`,
   ])("syncs %s", (p) => expect(isSyncPath(p)).toBe(true));
 
@@ -23,6 +21,9 @@ describe("isSyncPath", () => {
     `${A}/macros-cache.txt`,
     `${A}/chat-cache.txt`,
     `${A}/cache.md5`,
+    // Edit Mode layouts are synced by the game itself
+    `${A}/edit-mode-cache-account.txt`,
+    `${C}/edit-mode-cache-character.txt`,
     `${C}/config-cache.wtf`,
     `${C}/layout-local.txt`,
     `${C}/chat-cache.txt`,

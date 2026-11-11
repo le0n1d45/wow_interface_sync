@@ -55,12 +55,12 @@ export function syncView(ctx: Ctx, flash?: string): HTMLElement {
   return h(
     "div",
     { class: "view" },
-    h("div", {}, h("h1", { class: "view-title", textContent: "Sync" }), h("p", { class: "view-sub", textContent: "Keep your WoW Forever UI layout and addon settings in step across computers." })),
+    h("div", {}, h("h1", { class: "view-title", textContent: "Sync" }), h("p", { class: "view-sub", textContent: "Keep your WoW Forever addon settings in step across computers." })),
     h("section", { class: "card summary" }, stat("Repository", repoLabel(ctx.config.repoUrl)), stat("WoW folder", shortPath(ctx.config.wowRoot)), stat("GitHub token", ctx.token.stored ? "Stored securely" : "Missing")),
     h(
       "div",
       { class: "actions" },
-      h("section", { class: "card action" }, h("div", { class: "icon" }, icon("push", 20)), h("h2", { textContent: "Push" }), h("p", { textContent: "Send this computer's Edit Mode layouts and addon settings, and refresh your WowUp addon list." }), push),
+      h("section", { class: "card action" }, h("div", { class: "icon" }, icon("push", 20)), h("h2", { textContent: "Push" }), h("p", { textContent: "Send this computer's addon settings, and refresh your WowUp addon list." }), push),
       h("section", { class: "card action" }, h("div", { class: "icon" }, icon("pull", 20)), h("h2", { textContent: "Pull" }), h("p", { textContent: "Apply the saved settings here. Anything that would change is backed up first, so you can undo it." }), pull),
     ),
     out,

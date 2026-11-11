@@ -1,6 +1,6 @@
 # WoW Interface Sync
 
-Electron + TypeScript app that syncs WoW Forever Edit Mode layouts and addon settings through a private
+Electron + TypeScript app that syncs WoW Forever addon settings through a private
 GitHub repo (isomorphic-git, no system git) and publishes a WowUp export string to a gist. See `README.md`.
 
 ## Workflow

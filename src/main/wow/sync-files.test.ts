@@ -28,7 +28,7 @@ describe("selectSyncFiles", () => {
     expect(await selectSyncFiles(dir)).toEqual([]);
   });
 
-  it("selects only edit-mode layouts and addon settings, sorted", async () => {
+  it("selects only addon settings, sorted, and skips game settings including Edit Mode layouts", async () => {
     for (const f of [
       "WTF/Config.wtf",
       "WTF/SavedVariables/Details.lua",
@@ -48,21 +48,19 @@ describe("selectSyncFiles", () => {
     expect(files.map((f) => f.repoPath)).toEqual([
       "WTF/Account/ACCT1/Dark Iron/Mychar/AddOns.txt",
       "WTF/Account/ACCT1/Dark Iron/Mychar/SavedVariables/Details.lua",
-      "WTF/Account/ACCT1/Dark Iron/Mychar/edit-mode-cache-character.txt",
       "WTF/Account/ACCT1/SavedVariables/DBM-Core.lua",
-      "WTF/Account/ACCT1/edit-mode-cache-account.txt",
       "WTF/SavedVariables/Details.lua",
     ]);
     expect(files[0].absolutePath).toBe(join(dir, "WTF/Account/ACCT1/Dark Iron/Mychar/AddOns.txt"));
   });
 
   it("renames the account folder via the account map", async () => {
-    await touch("WTF/Account/ACCT1/edit-mode-cache-account.txt");
-    await touch("WTF/Account/OTHER/edit-mode-cache-account.txt");
+    await touch("WTF/Account/ACCT1/SavedVariables/A.lua");
+    await touch("WTF/Account/OTHER/SavedVariables/A.lua");
     const files = await selectSyncFiles(dir, { ACCT1: "main" });
     expect(files.map((f) => f.repoPath)).toEqual([
-      "WTF/Account/OTHER/edit-mode-cache-account.txt",
-      "WTF/Account/main/edit-mode-cache-account.txt",
+      "WTF/Account/OTHER/SavedVariables/A.lua",
+      "WTF/Account/main/SavedVariables/A.lua",
     ]);
   });
 

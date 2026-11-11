@@ -8,7 +8,7 @@ import { diffCloneAgainstLocal } from "./diff";
 import { makeSandbox, type Sandbox } from "./test-helpers";
 
 const SV = "WTF/Account/ACCT1/SavedVariables/Addon.lua";
-const EM = "WTF/Account/ACCT1/edit-mode-cache-account.txt";
+const EM = "WTF/SavedVariables/Global.lua";
 const NEWF = "WTF/SavedVariables/Fresh.lua";
 const CFG = "WTF/Account/ACCT1/config-cache.wtf";
 

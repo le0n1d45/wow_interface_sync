@@ -12,7 +12,7 @@ import { pullAll, pushAll } from "./sync";
 import type { SyncDeps } from "./sync.types";
 
 const SV = "WTF/Account/ACCT1/SavedVariables/Addon.lua";
-const EM = "WTF/Account/ACCT1/edit-mode-cache-account.txt";
+const EM = "WTF/Account/ACCT1/SavedVariables/Other.lua";
 const CFG = "WTF/Account/ACCT1/config-cache.wtf";
 
 interface Machine {
@@ -81,16 +81,18 @@ describe.skipIf(!hasSystemGit)("push on one machine, pull on another", () => {
     const b = await machine("pc-b", { OTHERACCT: "shared" });
 
     await put(a.forever, `WTF/${SV.slice(4)}`, "settings-from-a");
-    await put(a.forever, EM, "layout-from-a");
+    await put(a.forever, EM, "other-from-a");
+    await put(a.forever, "WTF/Account/ACCT1/edit-mode-cache-account.txt", "layout-from-a");
     await put(a.forever, CFG, "graphics-a");
     await put(b.forever, `WTF/Account/OTHERACCT/SavedVariables/Addon.lua`, "old-b");
+    await put(b.forever, "WTF/Account/OTHERACCT/edit-mode-cache-account.txt", "keep-b-layout");
     await put(b.forever, "WTF/Account/OTHERACCT/config-cache.wtf", "graphics-b");
 
     const pushed = await pushAll(a.deps);
     expect(pushed).toMatchObject({ filesSelected: 2, committed: true, changedFiles: 2, gist: { status: "updated" } });
     expect(gitOut(remote.bare, "ls-tree", "-r", "--name-only", "main").split("\n").sort()).toEqual([
       "WTF/Account/shared/SavedVariables/Addon.lua",
-      "WTF/Account/shared/edit-mode-cache-account.txt",
+      "WTF/Account/shared/SavedVariables/Other.lua",
     ]);
     expect(decodeExportString(a.gistWrites[0]).addons).toEqual([{ id: "42", name: "DBM", provider_name: "CurseV2" }]);
 
@@ -98,7 +100,8 @@ describe.skipIf(!hasSystemGit)("push on one machine, pull on another", () => {
     expect(pulled).toMatchObject({ changed: 1, created: 1, identical: 0 });
     const read = async (rel: string) => (await import("node:fs/promises")).readFile(join(b.forever, ...rel.split("/")), "utf8");
     expect(await read("WTF/Account/OTHERACCT/SavedVariables/Addon.lua")).toBe("settings-from-a");
-    expect(await read("WTF/Account/OTHERACCT/edit-mode-cache-account.txt")).toBe("layout-from-a");
+    expect(await read("WTF/Account/OTHERACCT/SavedVariables/Other.lua")).toBe("other-from-a");
+    expect(await read("WTF/Account/OTHERACCT/edit-mode-cache-account.txt")).toBe("keep-b-layout"); // game-synced, untouched
     expect(await read("WTF/Account/OTHERACCT/config-cache.wtf")).toBe("graphics-b"); // graphics untouched
 
     // Undo the pull.

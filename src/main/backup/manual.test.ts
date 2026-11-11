@@ -5,7 +5,7 @@ import { restoreBackup } from "./restore";
 import { makeSandbox, type Sandbox } from "./test-helpers";
 
 const SV = "WTF/Account/ACCT1/SavedVariables/Addon.lua";
-const EM = "WTF/Account/ACCT1/edit-mode-cache-account.txt";
+const EM = "WTF/SavedVariables/Global.lua";
 
 let sb: Sandbox;
 beforeEach(async () => {

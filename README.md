@@ -1,11 +1,11 @@
 # WoW Interface Sync
 
-Keeps your **WoW Forever** UI setup in sync across computers:
+Keeps your **WoW Forever** addon setup in sync across computers:
 
-- **Edit Mode layouts** (the built-in UI editor) and **addon settings** (`SavedVariables`) go to a **private GitHub repo**.
+- Your **addon settings** (`SavedVariables`, plus which addons are enabled per character) go to a **private GitHub repo**.
 - A **WowUp export string** of your installed addons is written to a **gist**, so a new machine can import its addon list in WowUp.
 
-Game and graphics settings (`Config.wtf`, `config-cache.wtf`, key bindings, caches) are deliberately **not** synced.
+Game settings are deliberately **not** synced: graphics and options (`Config.wtf`, `config-cache.wtf`), key bindings, caches, and the Edit Mode layouts, which WoW Forever already syncs for you.
 
 ## Set up (once per computer)
 
