@@ -7,10 +7,13 @@ as the GitHub release notes, so keep them readable.
 
 ## [Unreleased]
 
+### Changed
+- Edit Mode layouts are no longer synced, because WoW Forever already syncs them itself. Only addon settings (and which addons are enabled on each character) are synced now. Layouts already in your repo are left alone and ignored.
+
 ## [0.1.0] - 2026-11-11
 
 ### Added
-- First version. Keeps your WoW Forever addon settings (and which addons are enabled on each character) in a private GitHub repo, so every computer you play on can share them. **Push** sends this computer's settings; **Pull** applies the saved ones here. Game settings are never synced: graphics and options, key bindings, caches, and the Edit Mode layouts, which WoW Forever already syncs itself.
+- First version. Keeps your WoW Forever Edit Mode layouts and addon settings in a private GitHub repo, so every computer you play on can share them. **Push** sends this computer's settings; **Pull** applies the saved ones here. Game and graphics settings, key bindings and caches are never synced.
 - Your WowUp addon list is written to a gist as an export string each time you push, so a new computer can import its addons in WowUp. The app reads WowUp's own data, so there is nothing to copy and paste.
 - Every pull backs up the files it would change first, and rolls itself back if it fails partway. Restore any backup from the **Backups** screen, or press **Undo** right after a pull. Pulls never delete your files.
 - **Back up now** saves a copy of all your synced settings at any time, even with WoW open. Every backup has a Delete button; nothing on your computer is deleted automatically.
