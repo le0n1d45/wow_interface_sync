@@ -107,3 +107,35 @@ export async function pushFiles(o: RepoOptions, files: SyncFile[], message: stri
     }
   }
 }
+
+/**
+ * Removes every file from the repo in a single commit and pushes it. This is a normal commit, not a history
+ * rewrite: the old versions stay in the repo's git history, so a mistake can be undone from GitHub.
+ */
+export async function deleteAllFiles(o: RepoOptions, message: string): Promise<{ removedFiles: number }> {
+  for (let attempt = 0; ; attempt++) {
+    await syncClone(o);
+    let paths: string[];
+    try {
+      paths = await git.listFiles({ fs, dir: o.cloneDir, ref: "HEAD" });
+    } catch {
+      return { removedFiles: 0 }; // empty repo
+    }
+    if (paths.length === 0) return { removedFiles: 0 };
+
+    for (const path of paths) {
+      await rm(join(o.cloneDir, ...path.split("/")), { force: true });
+      await git.remove({ fs, dir: o.cloneDir, filepath: path });
+    }
+    await git.commit({ fs, dir: o.cloneDir, message, author: AUTHOR });
+    try {
+      const ref = (await git.currentBranch({ fs, dir: o.cloneDir })) ?? DEFAULT_BRANCH;
+      await git.push({ fs, http, dir: o.cloneDir, onAuth: onAuth(o.token), remote: "origin", ref });
+      return { removedFiles: paths.length };
+    } catch (e) {
+      const code = (e as { code?: string }).code;
+      if (attempt >= 1 || code === "HttpError" || code === "UnauthorizedError" || code === "ForbiddenError") throw e;
+      await cloneFresh(o); // remote moved underneath us: start again from its state
+    }
+  }
+}

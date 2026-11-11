@@ -28,3 +28,41 @@ export function msg(kind: MsgKind, ...children: Child[]): HTMLDivElement {
 export function msgs(first: HTMLElement, second: { kind: MsgKind; text: string } | null): HTMLElement[] {
   return second ? [first, h("div", { class: "gap" }), msg(second.kind, second.text)] : [first];
 }
+
+export interface ConfirmOptions {
+  title: string;
+  body: string;
+  confirmLabel: string;
+}
+
+/** Modal "are you sure" dialog over the page. Resolves true only for the confirm button; Esc, Cancel and the backdrop resolve false. */
+export function confirmDialog(opts: ConfirmOptions): Promise<boolean> {
+  return new Promise((resolve) => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const finish = (answer: boolean) => {
+      document.removeEventListener("keydown", onKey);
+      backdrop.remove();
+      previouslyFocused?.focus();
+      resolve(answer);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") finish(false);
+    };
+    const cancel = h("button", { class: "btn", textContent: "Cancel", onclick: () => finish(false) });
+    const confirm = h("button", { class: "btn danger-solid", textContent: opts.confirmLabel, onclick: () => finish(true) });
+    const backdrop = h(
+      "div",
+      { class: "modal-backdrop", onclick: (e: MouseEvent) => { if (e.target === backdrop) finish(false); } },
+      h(
+        "div",
+        { class: "modal", role: "alertdialog", ariaModal: "true", ariaLabel: opts.title },
+        h("h2", { textContent: opts.title }),
+        h("p", { textContent: opts.body }),
+        h("div", { class: "modal-actions" }, cancel, confirm),
+      ),
+    );
+    document.addEventListener("keydown", onKey);
+    document.body.append(backdrop);
+    cancel.focus(); // the safe choice is the default
+  });
+}

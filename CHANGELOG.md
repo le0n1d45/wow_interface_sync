@@ -7,6 +7,9 @@ as the GitHub release notes, so keep them readable.
 
 ## [Unreleased]
 
+### Added
+- **Delete all data in the sync repo** in Settings, for a fresh start. It asks "Are you sure?" first, then removes every file (your synced settings and uploaded backups) from the repo in one commit. GitHub's history keeps the older versions, so it can be recovered from there. Nothing on your computer is touched.
+
 ### Changed
 - Edit Mode layouts are no longer synced, because WoW Forever already syncs them itself. Only addon settings (and which addons are enabled on each character) are synced now. Layouts already in your repo are left alone and ignored.
 

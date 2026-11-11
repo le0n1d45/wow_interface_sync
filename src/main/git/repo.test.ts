@@ -5,7 +5,7 @@ import * as fs from "node:fs";
 import git from "isomorphic-git";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { SyncFile } from "../wow/wow.types";
-import { pushFiles, syncClone } from "./repo";
+import { deleteAllFiles, pushFiles, syncClone } from "./repo";
 import { gitOut, hasSystemGit, startTestRemote, type TestRemote } from "./test-server";
 
 const SV = "WTF/Account/main/SavedVariables/Addon.lua";
@@ -109,5 +109,43 @@ describe.skipIf(!hasSystemGit)("git sync against a local smart-HTTP remote", () 
     expect(gitOut(remote.bare, "show", "main:WTF/SavedVariables/Shared.lua")).toBe("m1-edit");
     expect(gitOut(remote.bare, "show", "main:WTF/SavedVariables/Other.lua")).toBe("m2-file");
     expect(gitOut(remote.bare, "ls-tree", "-r", "--name-only", "main")).not.toContain("orphan.txt");
+  });
+
+  it("deletes every file in one commit while history keeps the old versions", async () => {
+    remote = await startTestRemote({ empty: true });
+    const o = opts(remote.url);
+    await pushFiles(o, [await localFile("WTF/SavedVariables/A.lua", "a"), await localFile("backups/pc/id1/manifest.json", "{}")], "two files");
+
+    const r = await deleteAllFiles(o, "wipe");
+    expect(r.removedFiles).toBe(2);
+    expect(gitOut(remote.bare, "ls-tree", "-r", "--name-only", "main")).toBe("");
+    expect(gitOut(remote.bare, "show", "main~1:WTF/SavedVariables/A.lua")).toBe("a"); // recoverable from history
+    expect(gitOut(remote.bare, "log", "--format=%s", "-1")).toBe("wipe");
+  });
+
+  it("is a no-op on an empty or already wiped repo, and pushing again afterwards works", async () => {
+    remote = await startTestRemote({ empty: true });
+    const o = opts(remote.url);
+    expect((await deleteAllFiles(o, "wipe")).removedFiles).toBe(0); // brand-new empty remote
+
+    await pushFiles(o, [await localFile(SV, "v1")], "one");
+    await deleteAllFiles(o, "wipe");
+    expect((await deleteAllFiles(o, "wipe again")).removedFiles).toBe(0);
+    expect(gitOut(remote.bare, "rev-list", "--count", "main")).toBe("2");
+
+    await pushFiles(o, [await localFile(SV, "v2")], "after wipe");
+    expect(gitOut(remote.bare, "show", `main:${SV}`)).toBe("v2");
+  });
+
+  it("wipes even when another machine pushed in between (remote state wins as the base)", async () => {
+    remote = await startTestRemote({ empty: true });
+    const m1 = opts(remote.url, "m1");
+    const m2 = opts(remote.url, "m2");
+    await pushFiles(m1, [await localFile("WTF/SavedVariables/A.lua", "a")], "a");
+    await syncClone(m2);
+    await pushFiles(m1, [await localFile("WTF/SavedVariables/B.lua", "b")], "b");
+    const r = await deleteAllFiles(m2, "wipe");
+    expect(r.removedFiles).toBe(2); // includes the file m1 added after m2's clone
+    expect(gitOut(remote.bare, "ls-tree", "-r", "--name-only", "main")).toBe("");
   });
 });

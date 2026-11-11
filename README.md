@@ -27,6 +27,7 @@ Game settings are deliberately **not** synced: graphics and options (`Config.wtf
 - Each backup is also saved to your repo under `backups/<this computer>/`, and the repo keeps the newest 20 per computer (turn this off in Settings).
 - A pull only adds or overwrites. It **never deletes** local files.
 - If a pull fails midway it rolls itself back.
+- **Settings > Delete all data in the sync repo** empties the repo for a fresh start (after an "Are you sure?" prompt). It is one normal commit, so GitHub's history can still recover the old versions.
 - Pick any backup under **Backups** and press *Restore*, or press **Undo** right after a pull. Restoring is itself backed up, so it can be undone.
 
 ## WowUp export string

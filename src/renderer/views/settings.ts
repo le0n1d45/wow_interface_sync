@@ -1,9 +1,9 @@
 import type { AppConfig } from "@shared/config.types";
-import { h, msg } from "../dom";
+import { confirmDialog, h, msg } from "../dom";
 import { icon } from "../icons";
 import type { Ctx } from "../context";
 import { formatAccountMap, parseAccountMap } from "../format";
-import { isSetUp } from "../setup";
+import { isSetUp, repoLabel } from "../setup";
 
 function field(label: string, control: HTMLElement, help?: string): HTMLLabelElement {
   return h("label", { class: "field" }, h("span", { class: "label", textContent: label }), control, help ? h("span", { class: "help", textContent: help }) : null);
@@ -89,6 +89,29 @@ export function settingsView(ctx: Ctx): HTMLElement {
     },
   });
 
+  const dangerOut = h("div");
+  const wipe = ctx.guard(
+    h("button", {
+      class: "btn danger",
+      textContent: "Delete all data in the sync repo",
+      onclick: async () => {
+        const sure = await confirmDialog({
+          title: "Delete all data in the sync repo?",
+          body: `This removes every file from ${repoLabel(ctx.config.repoUrl)}: your synced settings and all uploaded backups. Git history keeps the older versions, so GitHub can still recover them. Nothing on this computer is touched.`,
+          confirmLabel: "Yes, delete everything",
+        });
+        if (!sure) return;
+        const r = await ctx.withBusy(() => window.sync.wipeRepo());
+        dangerOut.replaceChildren(
+          r.ok ? msg("ok", r.value.removedFiles === 0 ? "The repo was already empty." : `Deleted ${r.value.removedFiles} files from the repo.`) : msg("err", r.error),
+        );
+      },
+    }),
+  );
+  const dangerCard = firstRun
+    ? null
+    : h("section", { class: "card" }, h("h2", { textContent: "Danger zone" }), h("p", { class: "hint", textContent: "Empties the sync repo, for a fresh start." }), wipe, dangerOut);
+
   return h(
     "div",
     { class: "view" },
@@ -106,6 +129,9 @@ export function settingsView(ctx: Ctx): HTMLElement {
         h("label", { class: "field" }, h("span", { class: "label", textContent: "Access token" }), token, tokenLine, h("span", { class: "help", textContent: "A classic personal access token with the repo and gist scopes." }), clear),
       ),
       h(
+        "div",
+        { class: "stack" },
+        h(
         "section",
         { class: "card" },
         h("h2", { textContent: "World of Warcraft" }),
@@ -113,6 +139,8 @@ export function settingsView(ctx: Ctx): HTMLElement {
         h("div", { class: "field" }, h("span", { class: "label", textContent: "WoW folder" }), h("div", { class: "inline" }, wowRoot, detect)),
         h("label", { class: "check" }, pushBackups, h("span", { textContent: "Also save each backup to the GitHub repo, in a folder for this computer (the newest 20 are kept there)." })),
         h("details", { class: "adv" }, h("summary", { textContent: "Advanced: account names" }), field("Account mapping", accounts, "Only if your account folder (WTF/Account/<name>) is named differently on your computers. One per line: THISCOMPUTER=shared")),
+        ),
+        dangerCard,
       ),
     ),
     h("div", { class: "savebar" }, out, save),

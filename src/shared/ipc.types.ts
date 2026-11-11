@@ -13,6 +13,7 @@ export const IPC = {
   syncPull: "sync:pull",
   backupsList: "backups:list",
   backupsRestore: "backups:restore",
+  repoWipe: "repo:wipe",
   backupsCreate: "backups:create",
   backupsDelete: "backups:delete",
   wowDetect: "wow:detect",
@@ -44,6 +45,8 @@ export interface SyncApi {
   listBackups(): Promise<BackupManifest[]>;
   /** Restores a backup; returns the id of the safety backup that makes the restore undoable. */
   restoreBackup(id: string): Promise<Result<string>>;
+  /** Deletes every file in the sync repo in one commit (git history keeps the old versions). */
+  wipeRepo(): Promise<Result<{ removedFiles: number }>>;
   /** Snapshots the current synced files on demand; no pull involved. */
   createBackup(): Promise<Result<ManualBackupSummary>>;
   deleteBackup(id: string): Promise<Result<true>>;

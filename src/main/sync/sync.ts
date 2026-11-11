@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { updateGist } from "../gist/gist";
-import { pushFiles, syncClone } from "../git/repo";
+import { deleteAllFiles, pushFiles, syncClone } from "../git/repo";
 import { readManifest } from "../backup/backup";
 import { createManualBackup } from "../backup/manual";
 import { pullIntoInstall } from "../backup/pull";
@@ -83,4 +83,9 @@ export async function manualBackup(d: SyncDeps): Promise<ManualBackupSummary> {
   const foreverDir = await requireForeverDir(d);
   const backup = await createManualBackup(backupsDir(d), foreverDir);
   return { backup, remote: await uploadBackup(d, backup.id) };
+}
+
+/** Deletes every file in the sync repo (settings and uploaded backups) in one commit. Local files are not touched. */
+export async function wipeRepo(d: SyncDeps): Promise<{ removedFiles: number }> {
+  return deleteAllFiles(repoOptions(d), `Delete all data (requested from ${d.hostname} at ${new Date().toISOString()})`);
 }

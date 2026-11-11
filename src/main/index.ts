@@ -10,7 +10,7 @@ import { clearToken, loadToken, saveToken, tokenStatus } from "./auth/token-stor
 import { deleteBackup, listBackups } from "./backup/backup";
 import { createManualBackup } from "./backup/manual";
 import { restoreBackup } from "./backup/restore";
-import { manualBackup, pullAll, pushAll } from "./sync/sync";
+import { manualBackup, pullAll, pushAll, wipeRepo } from "./sync/sync";
 import type { SyncDeps } from "./sync/sync.types";
 import { detectForeverInstall, resolveForeverDir } from "./wow/install";
 import { assertWowClosed, isWowRunning } from "./wow/process";
@@ -62,6 +62,7 @@ function registerIpc(): void {
   });
   ipcMain.handle(IPC.syncPush, () => guard(async () => pushAll(await syncDeps())));
   ipcMain.handle(IPC.syncPull, () => guard(async () => pullAll(await syncDeps())));
+  ipcMain.handle(IPC.repoWipe, () => guard(async () => wipeRepo(await syncDeps())));
   ipcMain.handle(IPC.backupsList, () => listBackups(backupsDir()));
   ipcMain.handle(IPC.backupsRestore, (_evt, id: string) =>
     guard(async () => {
