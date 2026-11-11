@@ -6,7 +6,7 @@ files:
   - out/**
   - package.json
 asar: true
-artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+artifactName: WoW-Interface-Sync-${version}-${os}-${arch}.${ext}
 win:
   target:
     - target: portable

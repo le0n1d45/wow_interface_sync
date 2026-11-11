@@ -1,0 +1,189 @@
+name: Release
+
+# Run by hand from the Actions tab. Finds the latest "vX.Y.Z" tag, bumps the version, writes it to
+# package.json and moves the changelog's Unreleased entries under the new version, builds the portable
+# apps for Windows, Linux and macOS, and publishes a GitHub release with those builds attached and the
+# changelog entries as its notes. The tag is created by the release itself, so a failed build leaves no tag
+# behind and the same version can simply be released again.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Which part of the latest tag to increase
+        type: choice
+        options: [minor, patch, major]
+        default: minor
+      version:
+        description: Exact version instead (e.g. 1.0.0). Leave empty to bump the latest tag.
+        type: string
+        required: false
+
+permissions:
+  contents: write # push the version commit, create the release
+
+concurrency: release
+
+jobs:
+  prepare:
+    name: Version and changelog
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      previous_tag: ${{ steps.version.outputs.previous_tag }}
+      sha: ${{ steps.commit.outputs.sha }}
+      has_notes: ${{ steps.notes.outputs.has_notes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags are needed to find the previous version
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+      - name: Work out the new version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+          EXPLICIT: ${{ inputs.version }}
+        run: |
+          previous=$(git tag --list 'v*' | sed 's/^v//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)
+          previous_tag="${previous:+v$previous}"
+          previous="${previous:-0.0.0}"
+          if [ -n "$EXPLICIT" ]; then
+            next="$EXPLICIT"
+          else
+            IFS=. read -r major minor patch <<< "$previous"
+            case "$BUMP" in
+              major) next="$((major + 1)).0.0" ;;
+              minor) next="$major.$((minor + 1)).0" ;;
+              patch) next="$major.$minor.$((patch + 1))" ;;
+            esac
+          fi
+          if ! [[ "$next" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$next' is not a MAJOR.MINOR.PATCH version"; exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$next" > /dev/null; then
+            echo "::error::Tag v$next already exists"; exit 1
+          fi
+          if [ "$(printf '%s\n%s\n' "$previous" "$next" | sort -V | tail -n 1)" != "$next" ]; then
+            echo "::error::$next is not newer than the latest tag $previous"; exit 1
+          fi
+          echo "previous_tag=$previous_tag" >> "$GITHUB_OUTPUT"
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "Releasing v$next (previous tag: ${previous_tag:-none})"
+
+      - name: Write the version and the release notes
+        id: notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          # The notes are this version's changelog entries; the Unreleased ones move under the new
+          # version heading and are committed below.
+          if node tools/release-changelog.mjs CHANGELOG.md "$VERSION" "$RUNNER_TEMP/release-notes.md"; then
+            echo "has_notes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_notes=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No changelog entries for $VERSION, the release will use generated notes"
+          fi
+
+      # [skip ci]: the push-to-main build would only rebuild what this release is about to build.
+      - name: Commit the version bump
+        id: commit
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet; then
+            git commit -am "Release $VERSION [skip ci]"
+            git push origin HEAD:main
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.notes.outputs.has_notes == 'true'
+        with:
+          name: release-notes
+          path: ${{ runner.temp }}/release-notes.md
+          retention-days: 1
+
+  build:
+    name: Build (${{ matrix.os }})
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: windows-latest
+            builder-args: --win
+            artifact: windows-portable
+            path: dist/*.exe
+          - os: ubuntu-latest
+            builder-args: --linux
+            artifact: linux-appimage
+            path: dist/*.AppImage
+          - os: macos-latest
+            builder-args: --mac
+            artifact: macos-zip
+            path: dist/*.zip
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }} # the version commit
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx electron-vite build
+      - run: npx electron-builder ${{ matrix.builder-args }} --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.path }}
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }} # this job has no checkout for gh to read the repo from
+          VERSION: ${{ needs.prepare.outputs.version }}
+          PREVIOUS_TAG: ${{ needs.prepare.outputs.previous_tag }}
+          SHA: ${{ needs.prepare.outputs.sha }}
+          HAS_NOTES: ${{ needs.prepare.outputs.has_notes }}
+        run: |
+          if [ "$HAS_NOTES" = "true" ]; then
+            notes_file=artifacts/release-notes/release-notes.md
+            if [ -n "$PREVIOUS_TAG" ]; then
+              printf '\n**Full diff:** https://github.com/%s/compare/%s...v%s\n' \
+                "$GITHUB_REPOSITORY" "$PREVIOUS_TAG" "$VERSION" >> "$notes_file"
+            fi
+            notes=(--notes-file "$notes_file")
+          else
+            notes=(--generate-notes ${PREVIOUS_TAG:+--notes-start-tag "$PREVIOUS_TAG"})
+          fi
+          mkdir release
+          cp artifacts/windows-portable/* artifacts/linux-appimage/* artifacts/macos-zip/* release/
+          ls -l release
+          gh release create "v$VERSION" release/* \
+            --target "$SHA" \
+            --title "WoW Interface Sync $VERSION" \
+            "${notes[@]}"
