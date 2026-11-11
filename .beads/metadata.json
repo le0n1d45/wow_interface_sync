@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "wow_interface_sync",
+  "project_id": "5af4aa01-dd23-4e74-9b98-e85cfc31c499"
+}
