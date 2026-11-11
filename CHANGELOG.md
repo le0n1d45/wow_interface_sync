@@ -7,6 +7,8 @@ as the GitHub release notes, so keep them readable.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-11
+
 ### Added
 - First version. Keeps your WoW Forever Edit Mode layouts and addon settings in a private GitHub repo, so every computer you play on can share them. **Push** sends this computer's settings; **Pull** applies the saved ones here. Game and graphics settings, key bindings and caches are never synced.
 - Your WowUp addon list is written to a gist as an export string each time you push, so a new computer can import its addons in WowUp. The app reads WowUp's own data, so there is nothing to copy and paste.
