@@ -45,3 +45,7 @@ npm run package    # build a portable app for this platform into dist/
 ```
 
 GitHub Actions builds portable apps for Windows (`.exe`), Linux (AppImage) and macOS (zip) on every push to `main`. Artifacts are kept for 3 days. Builds are unsigned, so Windows SmartScreen and macOS Gatekeeper will warn on first launch.
+
+## License
+
+[MIT](LICENSE)

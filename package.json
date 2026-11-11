@@ -25,5 +25,6 @@
   "homepage": "https://github.com/le0n1d45/wow_interface_sync",
   "dependencies": {
     "isomorphic-git": "^1.44.12"
-  }
+  },
+  "license": "MIT"
 }
