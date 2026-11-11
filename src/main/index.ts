@@ -1,6 +1,6 @@
 import { hostname } from "node:os";
 import { dirname, join } from "node:path";
-import { app, BrowserWindow, ipcMain, safeStorage } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, nativeTheme, safeStorage } from "electron";
 import { IPC, type SaveConfigResult, type SaveTokenResult } from "@shared/ipc.types";
 import type { Result } from "@shared/sync.types";
 import type { AppConfig } from "@shared/config.types";
@@ -80,8 +80,13 @@ function registerIpc(): void {
 
 function createWindow(): void {
   const win = new BrowserWindow({
-    width: 720,
-    height: 560,
+    width: 860,
+    height: 700,
+    minWidth: 640,
+    minHeight: 560,
+    title: "WoW Interface Sync",
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#0e1014" : "#f3f4f7",
+    autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,
@@ -97,6 +102,8 @@ function createWindow(): void {
 }
 
 void app.whenReady().then(() => {
+  // No File/Edit/View/Window menu on Windows and Linux. macOS keeps its app menu (needed for Cmd+Q, copy/paste).
+  if (process.platform !== "darwin") Menu.setApplicationMenu(null);
   registerIpc();
   createWindow();
   app.on("activate", () => {
