@@ -1,7 +1,9 @@
 import { join } from "node:path";
 import { readGistFile, updateGist } from "../gist/gist";
 import { deleteAllFiles, pushFiles, syncClone } from "../git/repo";
-import type { ImportString } from "@shared/sync.types";
+import type { AddonInstallOutcome, ImportString } from "@shared/sync.types";
+import { CurseForgeClient } from "../addons/curseforge";
+import { installMissingAddons } from "../addons/install";
 import { readManifest } from "../backup/backup";
 import { createManualBackup } from "../backup/manual";
 import { pullIntoInstall } from "../backup/pull";
@@ -76,7 +78,26 @@ export async function pullAll(d: SyncDeps): Promise<PullSummary> {
   const remoteBackup: RemoteBackupOutcome = result.backupId
     ? await uploadBackup(d, result.backupId)
     : { status: "skipped", reason: "Nothing changed, so nothing was backed up." };
-  return { ...result, remoteBackup };
+  const addons = await installAddonsFromGist(d, foreverDir);
+  return { ...result, remoteBackup, addons };
+}
+
+/** Downloads the gist list's addons that are not installed yet. Never fails the pull that already succeeded. */
+export async function installAddonsFromGist(d: SyncDeps, foreverDir: string): Promise<AddonInstallOutcome> {
+  if (!d.config.installAddonsOnPull) return { status: "skipped", reason: "Addon downloads are turned off in Settings." };
+  if (!d.curseKey) return { status: "skipped", reason: "Add a CurseForge API key in Settings to download addons automatically." };
+  try {
+    const raw = await readGistFile(d.token, d.config.gistId, d.fetchFn);
+    if (!raw?.trim()) return { status: "skipped", reason: "The gist has no addon list yet. Push from a computer that has WowUp first." };
+    const summary = await installMissingAddons(decodeExportString(raw.trim()), {
+      api: new CurseForgeClient(d.curseKey, d.fetchFn, d.download),
+      addonsDir: join(foreverDir, "Interface", "AddOns"),
+      stagingDir: join(d.dataDir, "staging"),
+    });
+    return { status: "done", summary };
+  } catch (e) {
+    return { status: "failed", reason: (e as Error).message };
+  }
 }
 
 /** Snapshots the current synced files on demand and uploads the snapshot. Safe while WoW is open: nothing is written to the game. */

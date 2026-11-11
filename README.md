@@ -30,6 +30,10 @@ Game settings are deliberately **not** synced: graphics and options (`Config.wtf
 - **Settings > Delete all data in the sync repo** empties the repo for a fresh start (after an "Are you sure?" prompt). It is one normal commit, so GitHub's history can still recover the old versions.
 - Pick any backup under **Backups** and press *Restore*, or press **Undo** right after a pull. Restoring is itself backed up, so it can be undone.
 
+## Downloading addons on pull (optional)
+
+Off by default. In Settings, tick *Download missing addons when I pull* and paste a CurseForge API key (free at [console.curseforge.com](https://console.curseforge.com)). On every pull the app reads the addon list from your gist and downloads the ones missing from `Interface/AddOns`, so WowUp finds them on its next rescan. Existing addon folders are never overwritten. Only CurseForge addons are supported; others, and addons whose authors block downloads from other apps, are listed so you can install them in WowUp.
+
 ## WowUp export string
 
 On the Sync screen, **Copy WowUp import string** copies the list to your clipboard so you can paste it into WowUp (My Addons > Import), for example on a new computer.

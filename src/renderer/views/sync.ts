@@ -1,7 +1,7 @@
 import { h, msg, msgs } from "../dom";
 import { icon } from "../icons";
 import type { Ctx } from "../context";
-import { describePull, describePush, describeRemoteBackup } from "../format";
+import { describeAddonInstall, describePull, describePush, describeRemoteBackup } from "../format";
 import { repoLabel, shortPath } from "../setup";
 
 function stat(label: string, value: string): HTMLElement {
@@ -33,7 +33,7 @@ export function syncView(ctx: Ctx, flash?: string): HTMLElement {
           out.replaceChildren(msg("err", r.error));
           return;
         }
-        const { backupId, changed, created, identical, remoteBackup } = r.value;
+        const { backupId, changed, created, identical, remoteBackup, addons } = r.value;
         const remote = describeRemoteBackup(remoteBackup);
         const undo = backupId
           ? ctx.guard(
@@ -47,7 +47,7 @@ export function syncView(ctx: Ctx, flash?: string): HTMLElement {
               }),
             )
           : null;
-        out.replaceChildren(...msgs(msg("ok", describePull(changed, created, identical), undo), remote));
+        out.replaceChildren(...msgs(msg("ok", describePull(changed, created, identical), undo), remote, describeAddonInstall(addons)));
       },
     }, icon("pull"), "Pull from GitHub"),
   );
@@ -76,7 +76,7 @@ export function syncView(ctx: Ctx, flash?: string): HTMLElement {
       "div",
       { class: "actions" },
       h("section", { class: "card action" }, h("div", { class: "icon" }, icon("push", 20)), h("h2", { textContent: "Push" }), h("p", { textContent: "Send this computer's addon settings, and refresh your WowUp addon list." }), push),
-      h("section", { class: "card action" }, h("div", { class: "icon" }, icon("pull", 20)), h("h2", { textContent: "Pull" }), h("p", { textContent: "Apply the saved settings here. Anything that would change is backed up first, so you can undo it." }), pull),
+      h("section", { class: "card action" }, h("div", { class: "icon" }, icon("pull", 20)), h("h2", { textContent: "Pull" }), h("p", { textContent: "Apply the saved settings here and install any missing addons. Changed files are backed up first, so you can undo it." }), pull),
     ),
     h(
       "section",

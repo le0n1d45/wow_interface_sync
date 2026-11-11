@@ -8,6 +8,7 @@ import { restoreBackup } from "../backup/restore";
 import { gitOut, hasSystemGit, startTestRemote, type TestRemote } from "../git/test-server";
 import { GIST_FILE_NAME } from "../gist/gist";
 import { decodeExportString } from "../wowup/export-string";
+import { strToU8, zipSync } from "fflate";
 import { getImportString, pullAll, pushAll } from "./sync";
 import type { SyncDeps } from "./sync.types";
 
@@ -65,11 +66,14 @@ async function machine(name: string, accountMap: Record<string, string> = {}, wi
     forever,
     gistWrites,
     deps: {
-      config: { repoUrl: remote!.url, gistId: "g1", wowRoot, accountMap, pushBackups: true },
+      config: { repoUrl: remote!.url, gistId: "g1", wowRoot, accountMap, pushBackups: true, installAddonsOnPull: false },
       token: "tok",
       dataDir: join(root, "data"),
       installEnv: { platform: "linux", env: {} },
       fetchFn,
+      download: async () => {
+        throw new Error("no network in tests");
+      },
       assertWowClosed: async () => {},
       wowupDataDir: withWowUp ? wowupDir : join(root, "missing"),
       hostname: name,
@@ -169,6 +173,59 @@ describe.skipIf(!hasSystemGit)("push on one machine, pull on another", () => {
 
     const bare = await machine("pc-b", {}, false);
     await expect(getImportString(bare.deps)).rejects.toThrow(/gist has no addon list yet/);
+  });
+
+  it("on pull, downloads the gist's missing addons when enabled and a key is set; off or keyless it does not", async () => {
+    remote = await startTestRemote({ empty: true });
+    const a = await machine("pc-a"); // has WowUp with addon 42 (DBM) and pushes the list to the gist
+    await put(a.forever, SV, "x");
+    await pushAll(a.deps);
+
+    const b = await machine("pc-b", {}, false);
+    b.deps.fetchFn = async (url, init) => {
+      if (url === "https://api.curseforge.com/v1/mods/42") {
+        const file = { id: 1, displayName: "f", fileName: "f.zip", releaseType: 1, fileDate: "2026-01-01T00:00:00Z", downloadUrl: "https://cdn/42.zip", sortableGameVersions: [{ gameVersionTypeId: 88568 }], modules: [{ name: "DBM-Core" }] };
+        return { status: 200, headers: { get: () => null }, json: async () => ({ data: { id: 42, name: "DBM", allowModDistribution: true, latestFiles: [file] } }), text: async () => "" };
+      }
+      return a.deps.fetchFn(url, init); // the gist
+    };
+    const downloads: string[] = [];
+    b.deps.download = async (url) => {
+      downloads.push(url);
+      return zipSync({ "DBM-Core/DBM-Core.toc": strToU8("## Title: DBM") });
+    };
+
+    // Off by default: nothing downloaded, nothing said.
+    const off = await pullAll(b.deps);
+    expect(off.addons).toEqual({ status: "skipped", reason: "Addon downloads are turned off in Settings." });
+
+    // On, but no key: explains what is missing.
+    b.deps.config.installAddonsOnPull = true;
+    expect((await pullAll(b.deps)).addons).toMatchObject({ status: "skipped", reason: expect.stringContaining("CurseForge API key") });
+    expect(downloads).toEqual([]);
+
+    // On with a key: installs into Interface/AddOns, and a second pull leaves it alone.
+    b.deps.curseKey = "KEY";
+    const on = await pullAll(b.deps);
+    expect(on.addons).toEqual({ status: "done", summary: { installed: ["DBM"], alreadyPresent: 0, ignored: 0, needManual: [] } });
+    expect(await (await import("node:fs/promises")).readFile(join(b.forever, "Interface", "AddOns", "DBM-Core", "DBM-Core.toc"), "utf8")).toBe("## Title: DBM");
+    const again = await pullAll(b.deps);
+    expect(again.addons).toMatchObject({ status: "done", summary: { installed: [], alreadyPresent: 1 } });
+    expect(downloads).toHaveLength(1);
+  });
+
+  it("a failing addon download never fails the pull", async () => {
+    remote = await startTestRemote({ empty: true });
+    const a = await machine("pc-a");
+    await put(a.forever, SV, "x");
+    await pushAll(a.deps);
+    const b = await machine("pc-b", {}, false);
+    b.deps.fetchFn = async (url, init) => (url.includes("curseforge") ? { status: 500, headers: { get: () => null }, json: async () => ({}), text: async () => "" } : a.deps.fetchFn(url, init));
+    b.deps.config.installAddonsOnPull = true;
+    b.deps.curseKey = "KEY";
+    const r = await pullAll(b.deps);
+    expect(r.created).toBe(1); // the settings still arrived
+    expect(r.addons).toMatchObject({ status: "done", summary: { needManual: [{ name: "DBM", reason: expect.stringContaining("returned 500") }] } });
   });
 
   it("does not fail the file sync when WowUp is missing; reports it instead", async () => {

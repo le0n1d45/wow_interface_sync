@@ -142,7 +142,7 @@ details.adv summary { cursor: pointer; color: var(--muted); font-size: 12.5px; m
 }
 .field .btn.ghost { padding-left: 0; margin-top: 4px; }
 .gap { height: 8px; }
-.check { display: flex; align-items: flex-start; gap: 9px; margin-top: 4px; font-size: 13px; }
+.check { display: flex; align-items: flex-start; gap: 9px; margin: 4px 0 12px; font-size: 13px; }
 .check input { margin-top: 3px; accent-color: var(--accent); }
 .import { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .import h2 { margin-bottom: 2px; }

@@ -25,6 +25,7 @@ export type RemoteBackupOutcome =
 
 export interface PullSummary extends PullResult {
   remoteBackup: RemoteBackupOutcome;
+  addons: AddonInstallOutcome;
 }
 
 export interface ManualBackupSummary {
@@ -38,3 +39,19 @@ export interface ImportString {
   /** "gist" is the list your other computers pushed; "local" was built from this computer's WowUp. */
   source: "gist" | "local";
 }
+
+export interface AddonInstallSummary {
+  /** Names of addons that were downloaded and installed. */
+  installed: string[];
+  /** Addons whose folders were already in Interface/AddOns, left untouched. */
+  alreadyPresent: number;
+  /** Entries with nothing to install (CurseForge meta packages). */
+  ignored: number;
+  /** Addons that must be installed some other way, with the reason. */
+  needManual: { name: string; reason: string }[];
+}
+
+export type AddonInstallOutcome =
+  | { status: "done"; summary: AddonInstallSummary }
+  | { status: "skipped"; reason: string }
+  | { status: "failed"; reason: string };

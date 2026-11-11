@@ -10,6 +10,8 @@ export interface AppConfig {
   accountMap: Record<string, string>;
   /** Also upload each backup to the repo, under backups/<computer>/. */
   pushBackups: boolean;
+  /** On pull, download addons from the gist's WowUp list that are not installed yet (needs a CurseForge key). */
+  installAddonsOnPull: boolean;
 }
 
 export type ConfigIssue = { field: keyof AppConfig; message: string };

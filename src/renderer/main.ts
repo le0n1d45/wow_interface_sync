@@ -15,11 +15,13 @@ let pendingFlash: string | undefined;
 let guarded = new Set<HTMLButtonElement>();
 
 const ctx: Ctx = {
-  config: { repoUrl: "", gistId: "", wowRoot: "", accountMap: {}, pushBackups: true },
+  config: { repoUrl: "", gistId: "", wowRoot: "", accountMap: {}, pushBackups: true, installAddonsOnPull: false },
   token: { stored: false },
+  curse: { stored: false },
   async reload() {
     ctx.config = await window.sync.getConfig();
     ctx.token = await window.sync.getTokenStatus();
+    ctx.curse = await window.sync.getCurseKeyStatus();
     renderChrome();
   },
   go(next) {
@@ -111,6 +113,7 @@ async function start(): Promise<void> {
   );
   ctx.config = await window.sync.getConfig();
   ctx.token = await window.sync.getTokenStatus();
+  ctx.curse = await window.sync.getCurseKeyStatus();
   view = isSetUp(ctx.config, ctx.token) ? "sync" : "settings";
   wowRunning = await window.sync.isWowRunning();
   renderAll();

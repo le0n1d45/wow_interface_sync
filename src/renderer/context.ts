@@ -7,6 +7,8 @@ export type ViewName = "sync" | "backups" | "settings";
 export interface Ctx {
   config: AppConfig;
   token: TokenStatus;
+  /** Whether a CurseForge API key is stored. */
+  curse: TokenStatus;
   /** Re-reads settings/token status from the main process and refreshes the header. */
   reload(): Promise<void>;
   go(view: ViewName): void;

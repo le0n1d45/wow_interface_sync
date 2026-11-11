@@ -1,6 +1,6 @@
 import type { AppConfig } from "@shared/config.types";
 import type { BackupManifest } from "../main/backup/backup.types";
-import type { PushSummary, RemoteBackupOutcome } from "@shared/sync.types";
+import type { AddonInstallOutcome, PushSummary, RemoteBackupOutcome } from "@shared/sync.types";
 
 export function parseAccountMap(text: string): Record<string, string> {
   const map: Record<string, string> = {};
@@ -44,4 +44,25 @@ export function describeRemoteBackup(o: RemoteBackupOutcome): { kind: "ok" | "wa
   if (o.status === "pushed") return { kind: "ok", text: "A copy of the backup was saved to GitHub." };
   if (o.status === "failed") return { kind: "warn", text: `The backup was kept on this computer, but could not be saved to GitHub: ${o.reason}` };
   return o.reason.startsWith("Nothing changed") ? null : { kind: "warn", text: `The backup was kept on this computer only. ${o.reason}` };
+}
+
+export interface Note {
+  kind: "ok" | "warn" | "info";
+  text: string;
+  details?: string[];
+}
+
+/** What to tell the user about downloading addons during a pull. Null when they turned it off. */
+export function describeAddonInstall(o: AddonInstallOutcome): Note | null {
+  if (o.status === "failed") return { kind: "warn", text: `Addons were not downloaded: ${o.reason}` };
+  if (o.status === "skipped") return o.reason.includes("turned off") ? null : { kind: "info", text: o.reason };
+
+  const { installed, alreadyPresent, needManual } = o.summary;
+  const parts: string[] = [];
+  if (installed.length) parts.push(`installed ${installed.length} new addon${installed.length === 1 ? "" : "s"}`);
+  if (alreadyPresent) parts.push(`${alreadyPresent} already present`);
+  if (needManual.length) parts.push(`${needManual.length} need${needManual.length === 1 ? "s" : ""} installing in WowUp`);
+  const text = parts.length ? `Addons: ${parts.join(", ")}.` : "Addons: nothing to install.";
+  const details = [...installed.map((n) => `+ ${n}`), ...needManual.map((m) => `! ${m.name}: ${m.reason}`)];
+  return { kind: needManual.length ? "warn" : "ok", text: installed.length ? `${text} Rescan in WowUp to see them.` : text, details };
 }

@@ -24,9 +24,28 @@ export function msg(kind: MsgKind, ...children: Child[]): HTMLDivElement {
   return h("div", { class: `msg ${kind}`, role: kind === "err" ? "alert" : "status" }, icon(MSG_ICON[kind]), h("div", { class: "grow" }, ...children));
 }
 
-/** Message plus an optional follow-up message, spaced apart. */
-export function msgs(first: HTMLElement, second: { kind: MsgKind; text: string } | null): HTMLElement[] {
-  return second ? [first, h("div", { class: "gap" }), msg(second.kind, second.text)] : [first];
+export interface Note {
+  kind: MsgKind;
+  text: string;
+  /** Expandable lines under the message, e.g. addons that need a manual install. */
+  details?: string[];
+}
+
+/** A message followed by optional notes, spaced apart. Null notes are skipped. */
+export function msgs(first: HTMLElement, ...notes: (Note | null)[]): HTMLElement[] {
+  const out: HTMLElement[] = [first];
+  for (const n of notes) {
+    if (!n) continue;
+    out.push(
+      h("div", { class: "gap" }),
+      msg(
+        n.kind,
+        n.text,
+        n.details?.length ? h("details", { class: "adv" }, h("summary", { textContent: `Show ${n.details.length}` }), h("pre", { class: "files", textContent: n.details.join("\n") })) : null,
+      ),
+    );
+  }
+  return out;
 }
 
 export interface ConfirmOptions {

@@ -18,6 +18,20 @@ export function settingsView(ctx: Ctx): HTMLElement {
   const token = h("input", { class: "input", type: "password", autocomplete: "off", placeholder: ctx.token.stored ? "Stored. Type a new token to replace it" : "ghp_..." });
   const wowRoot = h("input", { class: "input", value: c.wowRoot, placeholder: "Folder that contains _forever_", spellcheck: false });
   const pushBackups = h("input", { type: "checkbox", checked: c.pushBackups });
+  const installAddons = h("input", { type: "checkbox", checked: c.installAddonsOnPull });
+  const curseKey = h("input", { class: "input", type: "password", autocomplete: "off", placeholder: ctx.curse.stored ? "Stored. Type a new key to replace it" : "Your CurseForge API key" });
+  const curseLine = h("span", { class: "help" });
+  const renderCurseLine = () => {
+    curseLine.textContent = ctx.curse.stored ? "A key is stored, encrypted by your operating system." : "No key stored yet. Without one, addons are not downloaded.";
+  };
+  renderCurseLine();
+  const clearCurse = h("button", { class: "btn sm ghost danger", textContent: "Remove stored key", hidden: !ctx.curse.stored });
+  clearCurse.onclick = async () => {
+    await window.sync.clearCurseKey();
+    await ctx.reload();
+    clearCurse.hidden = true;
+    renderCurseLine();
+  };
   const accounts = h("textarea", { class: "input", value: formatAccountMap(c.accountMap), placeholder: "MYACCOUNT=shared", spellcheck: false });
 
   const tokenLine = h("span", { class: "help" });
@@ -56,7 +70,7 @@ export function settingsView(ctx: Ctx): HTMLElement {
     class: "btn primary",
     textContent: firstRun ? "Save and continue" : "Save settings",
     onclick: async () => {
-      const next: AppConfig = { repoUrl: repoUrl.value.trim(), gistId: gistId.value.trim(), wowRoot: wowRoot.value.trim(), accountMap: parseAccountMap(accounts.value), pushBackups: pushBackups.checked };
+      const next: AppConfig = { repoUrl: repoUrl.value.trim(), gistId: gistId.value.trim(), wowRoot: wowRoot.value.trim(), accountMap: parseAccountMap(accounts.value), pushBackups: pushBackups.checked, installAddonsOnPull: installAddons.checked };
       save.disabled = true;
       try {
         const saved = await window.sync.saveConfig(next);
@@ -73,9 +87,21 @@ export function settingsView(ctx: Ctx): HTMLElement {
           }
           token.value = "";
         }
+        if (curseKey.value.trim()) {
+          out.replaceChildren(msg("info", "Checking the CurseForge key..."));
+          const k = await window.sync.saveCurseKey(curseKey.value);
+          if (!k.ok) {
+            out.replaceChildren(msg("err", k.problem ?? "CurseForge rejected the key."));
+            return;
+          }
+          curseKey.value = "";
+        }
         await ctx.reload(); // refresh config + token status so the UI never shows stale state
         renderTokenLine();
         clear.hidden = !ctx.token.stored;
+        clearCurse.hidden = !ctx.curse.stored;
+        curseKey.placeholder = ctx.curse.stored ? "Stored. Type a new key to replace it" : "Your CurseForge API key";
+        renderCurseLine();
         token.placeholder = ctx.token.stored ? "Stored. Type a new token to replace it" : "ghp_...";
         if (isSetUp(ctx.config, ctx.token)) {
           ctx.flash("Settings saved. You're ready to sync.");
@@ -108,6 +134,16 @@ export function settingsView(ctx: Ctx): HTMLElement {
       },
     }),
   );
+  const addonsCard = firstRun
+    ? null
+    : h(
+        "section",
+        { class: "card" },
+        h("h2", { textContent: "Addon downloads" }),
+        h("p", { class: "hint", textContent: "On pull, install addons from your WowUp list that this computer is missing." }),
+        h("label", { class: "check" }, installAddons, h("span", { textContent: "Download missing addons when I pull" })),
+        h("label", { class: "field" }, h("span", { class: "label", textContent: "CurseForge API key" }), curseKey, curseLine, h("span", { class: "help", textContent: "Free at console.curseforge.com. Most addons come from CurseForge, which only lets apps with a key download them." }), clearCurse),
+      );
   const dangerCard = firstRun
     ? null
     : h("section", { class: "card" }, h("h2", { textContent: "Danger zone" }), h("p", { class: "hint", textContent: "Empties the sync repo, for a fresh start." }), wipe, dangerOut);
@@ -140,6 +176,7 @@ export function settingsView(ctx: Ctx): HTMLElement {
         h("label", { class: "check" }, pushBackups, h("span", { textContent: "Also save each backup to the GitHub repo, in a folder for this computer (the newest 20 are kept there)." })),
         h("details", { class: "adv" }, h("summary", { textContent: "Advanced: account names" }), field("Account mapping", accounts, "Only if your account folder (WTF/Account/<name>) is named differently on your computers. One per line: THISCOMPUTER=shared")),
         ),
+        addonsCard,
         dangerCard,
       ),
     ),

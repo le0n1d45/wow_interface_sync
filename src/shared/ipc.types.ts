@@ -15,6 +15,9 @@ export const IPC = {
   backupsRestore: "backups:restore",
   repoWipe: "repo:wipe",
   copyImportString: "wowup:copy-import-string",
+  curseKeyStatus: "curse:status",
+  curseKeySave: "curse:save",
+  curseKeyClear: "curse:clear",
   backupsCreate: "backups:create",
   backupsDelete: "backups:delete",
   wowDetect: "wow:detect",
@@ -46,6 +49,10 @@ export interface SyncApi {
   listBackups(): Promise<BackupManifest[]>;
   /** Restores a backup; returns the id of the safety backup that makes the restore undoable. */
   restoreBackup(id: string): Promise<Result<string>>;
+  getCurseKeyStatus(): Promise<TokenStatus>;
+  /** Checks the key with CurseForge and stores it (encrypted) only if accepted. */
+  saveCurseKey(key: string): Promise<{ ok: boolean; problem?: string }>;
+  clearCurseKey(): Promise<void>;
   /** Puts the WowUp import string on the clipboard. Returns what was copied (without the string itself). */
   copyImportString(): Promise<Result<Omit<ImportString, "text">>>;
   /** Deletes every file in the sync repo in one commit (git history keeps the old versions). */

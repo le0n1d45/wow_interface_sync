@@ -6,7 +6,8 @@ import type { Result } from "@shared/sync.types";
 import type { AppConfig } from "@shared/config.types";
 import { validateToken } from "./auth/github-validate";
 import type { FetchLike } from "./auth/token.types";
-import { clearToken, loadToken, saveToken, tokenStatus } from "./auth/token-store";
+import { CurseForgeClient } from "./addons/curseforge";
+import { clearToken, CURSE_KEY_FILE_NAME, loadToken, saveToken, tokenStatus } from "./auth/token-store";
 import { deleteBackup, listBackups } from "./backup/backup";
 import { createManualBackup } from "./backup/manual";
 import { restoreBackup } from "./backup/restore";
@@ -27,6 +28,12 @@ async function guard<T>(fn: () => Promise<T>): Promise<Result<T>> {
   }
 }
 
+async function downloadBytes(url: string): Promise<Uint8Array> {
+  const res = await fetch(url, { headers: { "User-Agent": "wow-interface-sync" } });
+  if (!res.ok) throw new Error(`Download failed (${res.status}).`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
 async function syncDeps(): Promise<SyncDeps> {
   const config = await loadConfig(configDir());
   const issues = validateConfig(config);
@@ -39,6 +46,8 @@ async function syncDeps(): Promise<SyncDeps> {
     dataDir: configDir(),
     installEnv: { platform: process.platform, env: process.env },
     fetchFn: fetch as unknown as FetchLike,
+    curseKey: await loadToken(configDir(), safeStorage, CURSE_KEY_FILE_NAME),
+    download: downloadBytes,
     assertWowClosed: () => assertWowClosed(),
     hostname: hostname(),
   };
@@ -62,6 +71,13 @@ function registerIpc(): void {
   });
   ipcMain.handle(IPC.syncPush, () => guard(async () => pushAll(await syncDeps())));
   ipcMain.handle(IPC.syncPull, () => guard(async () => pullAll(await syncDeps())));
+  ipcMain.handle(IPC.curseKeyStatus, () => tokenStatus(configDir(), CURSE_KEY_FILE_NAME));
+  ipcMain.handle(IPC.curseKeyClear, () => clearToken(configDir(), CURSE_KEY_FILE_NAME));
+  ipcMain.handle(IPC.curseKeySave, async (_evt, key: string) => {
+    const check = await new CurseForgeClient(key.trim(), fetch as unknown as FetchLike, downloadBytes).validateKey();
+    if (check.ok) await saveToken(configDir(), key.trim(), safeStorage, CURSE_KEY_FILE_NAME);
+    return check;
+  });
   ipcMain.handle(IPC.copyImportString, () =>
     guard(async () => {
       const { text, ...info } = await getImportString(await syncDeps());

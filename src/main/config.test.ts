@@ -18,6 +18,7 @@ const valid = {
   wowRoot: "C:\\Program Files (x86)\\World of Warcraft",
   accountMap: { ACCT1: "main" },
   pushBackups: true,
+  installAddonsOnPull: true,
 };
 
 describe("config persistence", () => {
