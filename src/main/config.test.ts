@@ -17,6 +17,7 @@ const valid = {
   gistId: "aa5a315d61ae9438b18d",
   wowRoot: "C:\\Program Files (x86)\\World of Warcraft",
   accountMap: { ACCT1: "main" },
+  pushBackups: true,
 };
 
 describe("config persistence", () => {

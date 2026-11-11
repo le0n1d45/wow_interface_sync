@@ -23,3 +23,8 @@ const MSG_ICON = { ok: "check", warn: "alert", err: "alert", info: "info" } as c
 export function msg(kind: MsgKind, ...children: Child[]): HTMLDivElement {
   return h("div", { class: `msg ${kind}`, role: kind === "err" ? "alert" : "status" }, icon(MSG_ICON[kind]), h("div", { class: "grow" }, ...children));
 }
+
+/** Message plus an optional follow-up message, spaced apart. */
+export function msgs(first: HTMLElement, second: { kind: MsgKind; text: string } | null): HTMLElement[] {
+  return second ? [first, h("div", { class: "gap" }), msg(second.kind, second.text)] : [first];
+}

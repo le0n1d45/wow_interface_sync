@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isSetUp, repoLabel, shortPath } from "./setup";
 
-const cfg = { repoUrl: "https://github.com/me/r", gistId: "abc", wowRoot: "C:\\WoW", accountMap: {} };
+const cfg = { repoUrl: "https://github.com/me/r", gistId: "abc", wowRoot: "C:\\WoW", accountMap: {}, pushBackups: true };
 
 describe("isSetUp", () => {
   it("needs every field and a stored token", () => {

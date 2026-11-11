@@ -119,15 +119,6 @@ describe("pullIntoInstall", () => {
     };
     await expect(pullIntoInstall({ ...opts(), applyFile })).rejects.toThrow(/rollback also failed.*Restore backup/);
   });
-
-  it("prunes old backups beyond the retention count", async () => {
-    for (let i = 0; i < 4; i++) {
-      await sb.write("clone", SV, `v${i}`);
-      await pullIntoInstall({ ...opts(), retention: 2 });
-      await new Promise((r) => setTimeout(r, 5));
-    }
-    expect(await listBackups(sb.backups)).toHaveLength(2);
-  });
 });
 
 describe("restoreBackup", () => {

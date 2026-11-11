@@ -17,6 +17,7 @@ export function settingsView(ctx: Ctx): HTMLElement {
   const gistId = h("input", { class: "input", value: c.gistId, placeholder: "e.g. 8f3a9c2d41b6e0a7d5c9", spellcheck: false });
   const token = h("input", { class: "input", type: "password", autocomplete: "off", placeholder: ctx.token.stored ? "Stored. Type a new token to replace it" : "ghp_..." });
   const wowRoot = h("input", { class: "input", value: c.wowRoot, placeholder: "Folder that contains _forever_", spellcheck: false });
+  const pushBackups = h("input", { type: "checkbox", checked: c.pushBackups });
   const accounts = h("textarea", { class: "input", value: formatAccountMap(c.accountMap), placeholder: "MYACCOUNT=shared", spellcheck: false });
 
   const tokenLine = h("span", { class: "help" });
@@ -55,7 +56,7 @@ export function settingsView(ctx: Ctx): HTMLElement {
     class: "btn primary",
     textContent: firstRun ? "Save and continue" : "Save settings",
     onclick: async () => {
-      const next: AppConfig = { repoUrl: repoUrl.value.trim(), gistId: gistId.value.trim(), wowRoot: wowRoot.value.trim(), accountMap: parseAccountMap(accounts.value) };
+      const next: AppConfig = { repoUrl: repoUrl.value.trim(), gistId: gistId.value.trim(), wowRoot: wowRoot.value.trim(), accountMap: parseAccountMap(accounts.value), pushBackups: pushBackups.checked };
       save.disabled = true;
       try {
         const saved = await window.sync.saveConfig(next);
@@ -110,6 +111,7 @@ export function settingsView(ctx: Ctx): HTMLElement {
         h("h2", { textContent: "World of Warcraft" }),
         h("p", { class: "hint", textContent: "The folder that contains _forever_." }),
         h("div", { class: "field" }, h("span", { class: "label", textContent: "WoW folder" }), h("div", { class: "inline" }, wowRoot, detect)),
+        h("label", { class: "check" }, pushBackups, h("span", { textContent: "Also save each backup to the GitHub repo, in a folder for this computer (the newest 20 are kept there)." })),
         h("details", { class: "adv" }, h("summary", { textContent: "Advanced: account names" }), field("Account mapping", accounts, "Only if your account folder (WTF/Account/<name>) is named differently on your computers. One per line: THISCOMPUTER=shared")),
       ),
     ),

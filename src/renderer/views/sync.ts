@@ -1,7 +1,7 @@
-import { h, msg } from "../dom";
+import { h, msg, msgs } from "../dom";
 import { icon } from "../icons";
 import type { Ctx } from "../context";
-import { describePull, describePush } from "../format";
+import { describePull, describePush, describeRemoteBackup } from "../format";
 import { repoLabel, shortPath } from "../setup";
 
 function stat(label: string, value: string): HTMLElement {
@@ -33,7 +33,8 @@ export function syncView(ctx: Ctx, flash?: string): HTMLElement {
           out.replaceChildren(msg("err", r.error));
           return;
         }
-        const { backupId, changed, created, identical } = r.value;
+        const { backupId, changed, created, identical, remoteBackup } = r.value;
+        const remote = describeRemoteBackup(remoteBackup);
         const undo = backupId
           ? ctx.guard(
               h("button", {
@@ -46,7 +47,7 @@ export function syncView(ctx: Ctx, flash?: string): HTMLElement {
               }),
             )
           : null;
-        out.replaceChildren(msg("ok", describePull(changed, created, identical), undo));
+        out.replaceChildren(...msgs(msg("ok", describePull(changed, created, identical), undo), remote));
       },
     }, icon("pull"), "Pull from GitHub"),
   );

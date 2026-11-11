@@ -1,6 +1,6 @@
 import type { AppConfig, ConfigIssue } from "./config.types";
-import type { BackupManifest, PullResult } from "../main/backup/backup.types";
-import type { PushSummary, Result } from "./sync.types";
+import type { BackupManifest } from "../main/backup/backup.types";
+import type { ManualBackupSummary, PullSummary, PushSummary, Result } from "./sync.types";
 import type { TokenProtection, TokenStatus } from "./token.types";
 
 export const IPC = {
@@ -13,6 +13,8 @@ export const IPC = {
   syncPull: "sync:pull",
   backupsList: "backups:list",
   backupsRestore: "backups:restore",
+  backupsCreate: "backups:create",
+  backupsDelete: "backups:delete",
   wowDetect: "wow:detect",
   wowRunning: "wow:running",
 } as const;
@@ -38,10 +40,13 @@ export interface SyncApi {
   saveToken(token: string): Promise<SaveTokenResult>;
   clearToken(): Promise<void>;
   push(): Promise<Result<PushSummary>>;
-  pull(): Promise<Result<PullResult>>;
+  pull(): Promise<Result<PullSummary>>;
   listBackups(): Promise<BackupManifest[]>;
   /** Restores a backup; returns the id of the safety backup that makes the restore undoable. */
   restoreBackup(id: string): Promise<Result<string>>;
+  /** Snapshots the current synced files on demand; no pull involved. */
+  createBackup(): Promise<Result<ManualBackupSummary>>;
+  deleteBackup(id: string): Promise<Result<true>>;
   /** Auto-detected WoW root folder (the one containing `_forever_`), or null. */
   detectWowRoot(): Promise<string | null>;
   isWowRunning(): Promise<boolean>;

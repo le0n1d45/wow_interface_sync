@@ -6,8 +6,6 @@ import { resolveLocal, sha256OfFile, writeFileAtomic } from "./fs-utils";
 const MANIFEST = "manifest.json";
 const FILES_DIR = "files";
 
-export const DEFAULT_BACKUP_RETENTION = 10;
-
 function newBackupId(now = new Date()): string {
   return now.toISOString().replace(/[:.]/g, "-");
 }
@@ -82,12 +80,8 @@ export function backupFilePath(backupsDir: string, id: string, path: string): st
   return join(backupsDir, id, FILES_DIR, ...path.split("/"));
 }
 
-/** Deletes all but the newest `keep` backups. */
-export async function pruneBackups(backupsDir: string, keep: number): Promise<string[]> {
-  const removed: string[] = [];
-  for (const m of (await listBackups(backupsDir)).slice(Math.max(keep, 1))) {
-    await rm(join(backupsDir, m.id), { recursive: true, force: true });
-    removed.push(m.id);
-  }
-  return removed;
+/** Deletes one backup. */
+export async function deleteBackup(backupsDir: string, id: string): Promise<void> {
+  await readManifest(backupsDir, id); // validates the id and that it exists
+  await rm(join(backupsDir, id), { recursive: true, force: true });
 }

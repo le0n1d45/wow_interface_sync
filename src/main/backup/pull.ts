@@ -1,4 +1,4 @@
-import { createBackup, DEFAULT_BACKUP_RETENTION, pruneBackups } from "./backup";
+import { createBackup } from "./backup";
 import type { PullResult } from "./backup.types";
 import { diffCloneAgainstLocal } from "./diff";
 import { copyFileAtomic, resolveLocal } from "./fs-utils";
@@ -10,7 +10,6 @@ export interface PullOptions {
   foreverDir: string;
   backupsDir: string;
   accountMap?: AccountMap;
-  retention?: number;
   /** Throws if the game is running. Injected so it can be tested without a process list. */
   assertWowClosed: () => Promise<void>;
   /** Writes one incoming file. Injectable so failures can be simulated in tests. */
@@ -54,6 +53,5 @@ export async function pullIntoInstall(opts: PullOptions): Promise<PullResult> {
     throw new Error(`Pull failed and was rolled back (backup ${manifest.id}): ${(e as Error).message}`);
   }
 
-  await pruneBackups(opts.backupsDir, opts.retention ?? DEFAULT_BACKUP_RETENTION);
   return { backupId: manifest.id, changed, created, identical };
 }

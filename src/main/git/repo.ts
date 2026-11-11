@@ -63,14 +63,23 @@ export async function syncClone(o: RepoOptions): Promise<void> {
   }
 }
 
-async function commitLocalFiles(o: RepoOptions, files: SyncFile[], message: string): Promise<PushResult> {
+/** Returns repo paths to delete, given the clone. Only used to trim old backups; synced settings stay additive. */
+export type DeletePaths = (cloneDir: string) => Promise<string[]>;
+
+async function commitLocalFiles(o: RepoOptions, files: SyncFile[], message: string, deletePaths?: DeletePaths): Promise<PushResult> {
   for (const f of files) await copyFileAtomic(f.absolutePath, join(o.cloneDir, ...f.repoPath.split("/")));
+  let removed = 0;
+  for (const path of (await deletePaths?.(o.cloneDir)) ?? []) {
+    await rm(join(o.cloneDir, ...path.split("/")), { force: true });
+    await git.remove({ fs, dir: o.cloneDir, filepath: path });
+    removed++;
+  }
 
   // statusMatrix rows are [path, HEAD, WORKDIR, STAGE]; [1,1,1] is unchanged and WORKDIR 0 is a deletion,
   // which is never staged because the repo is additive.
   const rows = await git.statusMatrix({ fs, dir: o.cloneDir });
   const toStage = rows.filter(([, head, workdir, stage]) => workdir !== 0 && !(head === 1 && workdir === 1 && stage === 1));
-  if (toStage.length === 0) return { committed: false, changedFiles: 0 };
+  if (toStage.length === 0 && removed === 0) return { committed: false, changedFiles: 0 };
 
   for (const [path] of toStage) await git.add({ fs, dir: o.cloneDir, filepath: path });
   const commitOid = await git.commit({ fs, dir: o.cloneDir, message, author: AUTHOR });
@@ -82,10 +91,10 @@ async function commitLocalFiles(o: RepoOptions, files: SyncFile[], message: stri
  * Additive: files missing locally are never deleted from the repo (other machines may own them).
  * If the remote moved underneath us, the clone is rebuilt from it and the local files are re-applied.
  */
-export async function pushFiles(o: RepoOptions, files: SyncFile[], message: string): Promise<PushResult> {
+export async function pushFiles(o: RepoOptions, files: SyncFile[], message: string, deletePaths?: DeletePaths): Promise<PushResult> {
   for (let attempt = 0; ; attempt++) {
     await syncClone(o);
-    const result = await commitLocalFiles(o, files, message);
+    const result = await commitLocalFiles(o, files, message, deletePaths);
     if (!result.committed) return result;
     try {
       const ref = (await git.currentBranch({ fs, dir: o.cloneDir })) ?? DEFAULT_BRANCH;

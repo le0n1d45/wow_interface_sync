@@ -62,7 +62,7 @@ async function machine(name: string, accountMap: Record<string, string> = {}, wi
     forever,
     gistWrites,
     deps: {
-      config: { repoUrl: remote!.url, gistId: "g1", wowRoot, accountMap },
+      config: { repoUrl: remote!.url, gistId: "g1", wowRoot, accountMap, pushBackups: true },
       token: "tok",
       dataDir: join(root, "data"),
       installEnv: { platform: "linux", env: {} },
@@ -107,9 +107,39 @@ describe.skipIf(!hasSystemGit)("push on one machine, pull on another", () => {
     await restoreBackup(join(b.deps.dataDir, "backups"), b.forever, backup.id);
     expect(await read("WTF/Account/OTHERACCT/SavedVariables/Addon.lua")).toBe("old-b");
 
+    // The pull's backup was also uploaded, into this computer's own folder.
+    expect(pulled.remoteBackup).toEqual({ status: "pushed" });
+    expect(gitOut(remote.bare, "ls-tree", "-r", "--name-only", "main")).toContain(`backups/pc-b/${pulled.backupId}/manifest.json`);
+
     // A second pull of unchanged content makes nothing new.
     await pullAll(b.deps);
     expect((await pullAll(b.deps)).backupId).toBeNull();
+  });
+
+  it("keeps the local backup and pull when the upload is turned off or fails", async () => {
+    remote = await startTestRemote({ empty: true });
+    const a = await machine("pc-a");
+    const b = await machine("pc-b");
+    await put(a.forever, SV, "from-a");
+    await pushAll(a.deps);
+
+    b.deps.config.pushBackups = false;
+    await put(b.forever, SV, "old-b");
+    const off = await pullAll(b.deps);
+    expect(off.changed).toBe(1);
+    expect(off.remoteBackup.status).toBe("skipped");
+    expect(gitOut(remote.bare, "ls-tree", "-r", "--name-only", "main")).not.toContain("backups/");
+
+    // Upload on, but the server goes away right after the pull's files are applied.
+    b.deps.config.pushBackups = true;
+    await put(a.forever, SV, "from-a-2");
+    await pushAll(a.deps);
+    await put(b.forever, SV, "old-b-2");
+    const { uploadBackup } = await import("./sync");
+    await remote.close();
+    remote = undefined;
+    const failed = await uploadBackup(b.deps, off.backupId!);
+    expect(failed.status).toBe("failed");
   });
 
   it("does not fail the file sync when WowUp is missing; reports it instead", async () => {

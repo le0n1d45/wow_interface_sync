@@ -1,5 +1,6 @@
 import type { AppConfig } from "@shared/config.types";
-import type { PushSummary } from "@shared/sync.types";
+import type { BackupManifest } from "../main/backup/backup.types";
+import type { PushSummary, RemoteBackupOutcome } from "@shared/sync.types";
 
 export function parseAccountMap(text: string): Record<string, string> {
   const map: Record<string, string> = {};
@@ -30,4 +31,17 @@ export function describePush(r: PushSummary): string {
 export function describePull(changed: number, created: number, identical: number): string {
   if (changed + created === 0) return `Already up to date (${identical} files match).`;
   return `Pulled: ${changed} changed, ${created} new.`;
+}
+
+export function describeBackup(b: Pick<BackupManifest, "reason" | "summary" | "files">): string {
+  if (b.reason === "manual") return `Manual backup: ${b.files.length} file${b.files.length === 1 ? "" : "s"}`;
+  if (b.reason === "restore") return "Before a restore";
+  return `Before a pull: ${b.summary.changed} changed, ${b.summary.new} new`;
+}
+
+/** What to tell the user about the repo copy of a backup. Skips that are not worth mentioning return null. */
+export function describeRemoteBackup(o: RemoteBackupOutcome): { kind: "ok" | "warn"; text: string } | null {
+  if (o.status === "pushed") return { kind: "ok", text: "A copy of the backup was saved to GitHub." };
+  if (o.status === "failed") return { kind: "warn", text: `The backup was kept on this computer, but could not be saved to GitHub: ${o.reason}` };
+  return o.reason.startsWith("Nothing changed") ? null : { kind: "warn", text: `The backup was kept on this computer only. ${o.reason}` };
 }

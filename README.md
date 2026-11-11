@@ -22,10 +22,12 @@ Game and graphics settings (`Config.wtf`, `config-cache.wtf`, key bindings, cach
 
 ## Safety
 
-- Before a pull changes anything, the files that would change are **backed up** (the newest 10 backups are kept).
+- Before a pull changes anything, the files that would change are **backed up**. You can also press **Back up now** on the Backups screen at any time, even with WoW open.
+- Backups on your computer are **never deleted automatically**; each has a Delete button.
+- Each backup is also saved to your repo under `backups/<this computer>/`, and the repo keeps the newest 20 per computer (turn this off in Settings).
 - A pull only adds or overwrites. It **never deletes** local files.
 - If a pull fails midway it rolls itself back.
-- Pick any backup under **Backups** and press *Restore this backup*, or press **Undo** right after a pull. Restoring is itself backed up, so it can be undone.
+- Pick any backup under **Backups** and press *Restore*, or press **Undo** right after a pull. Restoring is itself backed up, so it can be undone.
 
 ## WowUp export string
 

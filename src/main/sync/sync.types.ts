@@ -1,6 +1,5 @@
 import type { AppConfig } from "@shared/config.types";
 import type { FetchLike } from "../auth/token.types";
-import type { PullResult } from "../backup/backup.types";
 import type { InstallEnv } from "../wow/wow.types";
 
 export interface SyncDeps {
@@ -17,6 +16,5 @@ export interface SyncDeps {
   hostname: string;
 }
 
-export type { GistOutcome, PushSummary } from "@shared/sync.types";
+export type { GistOutcome, ManualBackupSummary, PullSummary, PushSummary, RemoteBackupOutcome } from "@shared/sync.types";
 
-export type PullSummary = PullResult;

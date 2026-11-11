@@ -141,3 +141,8 @@ details.adv summary { cursor: pointer; color: var(--muted); font-size: 12.5px; m
   .actions, .grid-2, .summary { grid-template-columns: 1fr; }
 }
 .field .btn.ghost { padding-left: 0; margin-top: 4px; }
+.gap { height: 8px; }
+.check { display: flex; align-items: flex-start; gap: 9px; margin-top: 4px; font-size: 13px; }
+.check input { margin-top: 3px; accent-color: var(--accent); }
+.title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.row-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }

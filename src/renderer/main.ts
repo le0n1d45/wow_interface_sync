@@ -15,7 +15,7 @@ let pendingFlash: string | undefined;
 let guarded = new Set<HTMLButtonElement>();
 
 const ctx: Ctx = {
-  config: { repoUrl: "", gistId: "", wowRoot: "", accountMap: {} },
+  config: { repoUrl: "", gistId: "", wowRoot: "", accountMap: {}, pushBackups: true },
   token: { stored: false },
   async reload() {
     ctx.config = await window.sync.getConfig();

@@ -5,7 +5,7 @@ import type { AppConfig, ConfigIssue } from "@shared/config.types";
 export const CONFIG_FILE_NAME = "config.json";
 
 export function defaultConfig(): AppConfig {
-  return { repoUrl: "", gistId: "", wowRoot: "", accountMap: {} };
+  return { repoUrl: "", gistId: "", wowRoot: "", accountMap: {}, pushBackups: true };
 }
 
 export function configPath(dir: string): string {

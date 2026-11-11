@@ -8,6 +8,8 @@ export interface AppConfig {
   wowRoot: string;
   /** Maps this machine's WTF account folder name to the shared name used in the repo. */
   accountMap: Record<string, string>;
+  /** Also upload each backup to the repo, under backups/<computer>/. */
+  pushBackups: boolean;
 }
 
 export type ConfigIssue = { field: keyof AppConfig; message: string };

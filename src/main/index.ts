@@ -7,9 +7,10 @@ import type { AppConfig } from "@shared/config.types";
 import { validateToken } from "./auth/github-validate";
 import type { FetchLike } from "./auth/token.types";
 import { clearToken, loadToken, saveToken, tokenStatus } from "./auth/token-store";
-import { listBackups } from "./backup/backup";
+import { deleteBackup, listBackups } from "./backup/backup";
+import { createManualBackup } from "./backup/manual";
 import { restoreBackup } from "./backup/restore";
-import { pullAll, pushAll } from "./sync/sync";
+import { manualBackup, pullAll, pushAll } from "./sync/sync";
 import type { SyncDeps } from "./sync/sync.types";
 import { detectForeverInstall, resolveForeverDir } from "./wow/install";
 import { assertWowClosed, isWowRunning } from "./wow/process";
@@ -69,6 +70,26 @@ function registerIpc(): void {
       const foreverDir = await resolveForeverDir(config.wowRoot);
       if (!foreverDir) throw new Error("WoW Forever folder not found. Check the settings.");
       return restoreBackup(backupsDir(), foreverDir, id);
+    }),
+  );
+  ipcMain.handle(IPC.backupsCreate, () =>
+    guard(async () => {
+      // Full sync dependencies (token etc.) are only needed to upload; without them the backup stays local.
+      try {
+        return await manualBackup(await syncDeps());
+      } catch (e) {
+        const config = await loadConfig(configDir());
+        const foreverDir = await resolveForeverDir(config.wowRoot);
+        if (!foreverDir) throw new Error("WoW Forever folder not found. Check the settings.");
+        const backup = await createManualBackup(backupsDir(), foreverDir);
+        return { backup, remote: { status: "skipped" as const, reason: (e as Error).message } };
+      }
+    }),
+  );
+  ipcMain.handle(IPC.backupsDelete, (_evt, id: string) =>
+    guard(async () => {
+      await deleteBackup(backupsDir(), id);
+      return true as const;
     }),
   );
   ipcMain.handle(IPC.wowDetect, async () => {

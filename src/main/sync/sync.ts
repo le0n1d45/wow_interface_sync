@@ -1,18 +1,35 @@
 import { join } from "node:path";
 import { updateGist } from "../gist/gist";
 import { pushFiles, syncClone } from "../git/repo";
+import { readManifest } from "../backup/backup";
+import { createManualBackup } from "../backup/manual";
 import { pullIntoInstall } from "../backup/pull";
+import { pushBackup } from "../backup/remote";
 import { resolveForeverDir } from "../wow/install";
 import { selectSyncFiles } from "../wow/sync-files";
 import { encodeExportString, readForeverExport } from "../wowup/export-string";
 import { locateWowUpData } from "../wowup/locate";
-import type { GistOutcome, PullSummary, PushSummary, SyncDeps } from "./sync.types";
+import type { GistOutcome, ManualBackupSummary, PullSummary, PushSummary, RemoteBackupOutcome, SyncDeps } from "./sync.types";
 
 const repoOptions = (d: SyncDeps) => ({
   cloneDir: join(d.dataDir, "repo"),
   repoUrl: d.config.repoUrl,
   token: d.token,
 });
+
+const backupsDir = (d: SyncDeps) => join(d.dataDir, "backups");
+
+/** Best effort: a failed upload never fails the local backup that already succeeded. */
+export async function uploadBackup(d: SyncDeps, id: string): Promise<RemoteBackupOutcome> {
+  if (!d.config.pushBackups) return { status: "skipped", reason: "Uploading backups is turned off in Settings." };
+  try {
+    await readManifest(backupsDir(d), id);
+    await pushBackup(repoOptions(d), backupsDir(d), id, d.hostname);
+    return { status: "pushed" };
+  } catch (e) {
+    return { status: "failed", reason: (e as Error).message };
+  }
+}
 
 async function requireForeverDir(d: SyncDeps): Promise<string> {
   const dir = await resolveForeverDir(d.config.wowRoot);
@@ -48,11 +65,22 @@ export async function pullAll(d: SyncDeps): Promise<PullSummary> {
   const foreverDir = await requireForeverDir(d);
   const opts = repoOptions(d);
   await syncClone(opts);
-  return pullIntoInstall({
+  const result = await pullIntoInstall({
     cloneDir: opts.cloneDir,
     foreverDir,
-    backupsDir: join(d.dataDir, "backups"),
+    backupsDir: backupsDir(d),
     accountMap: d.config.accountMap,
     assertWowClosed: d.assertWowClosed,
   });
+  const remoteBackup: RemoteBackupOutcome = result.backupId
+    ? await uploadBackup(d, result.backupId)
+    : { status: "skipped", reason: "Nothing changed, so nothing was backed up." };
+  return { ...result, remoteBackup };
+}
+
+/** Snapshots the current synced files on demand and uploads the snapshot. Safe while WoW is open: nothing is written to the game. */
+export async function manualBackup(d: SyncDeps): Promise<ManualBackupSummary> {
+  const foreverDir = await requireForeverDir(d);
+  const backup = await createManualBackup(backupsDir(d), foreverDir);
+  return { backup, remote: await uploadBackup(d, backup.id) };
 }

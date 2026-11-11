@@ -9,7 +9,7 @@ export interface FileChange {
   status: ChangeStatus;
 }
 
-export type BackupReason = "pull" | "restore";
+export type BackupReason = "pull" | "restore" | "manual";
 
 export interface BackupFileEntry {
   /** POSIX path relative to the `_forever_` folder. */
