@@ -1,0 +1,50 @@
+name: Build portable apps
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            builder-args: --win
+            artifact: windows-portable
+            path: dist/*.exe
+          - os: ubuntu-latest
+            builder-args: --linux
+            artifact: linux-appimage
+            path: dist/*.AppImage
+          - os: macos-latest
+            builder-args: --mac
+            artifact: macos-zip
+            path: dist/*.zip
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npx electron-vite build
+      - run: npx electron-builder ${{ matrix.builder-args }} --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}-${{ github.run_number }}
+          path: ${{ matrix.path }}
+          if-no-files-found: error
+          retention-days: 3
