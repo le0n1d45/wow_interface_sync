@@ -29,4 +29,5 @@ export type FetchLike = (url: string, init: { headers: Record<string, string>; m
   status: number;
   headers: { get(name: string): string | null };
   json(): Promise<unknown>;
+  text(): Promise<string>;
 }>;

@@ -11,6 +11,7 @@ const api: SyncApi = {
   pull: () => ipcRenderer.invoke(IPC.syncPull),
   listBackups: () => ipcRenderer.invoke(IPC.backupsList),
   restoreBackup: (id) => ipcRenderer.invoke(IPC.backupsRestore, id),
+  copyImportString: () => ipcRenderer.invoke(IPC.copyImportString),
   wipeRepo: () => ipcRenderer.invoke(IPC.repoWipe),
   createBackup: () => ipcRenderer.invoke(IPC.backupsCreate),
   deleteBackup: (id) => ipcRenderer.invoke(IPC.backupsDelete, id),

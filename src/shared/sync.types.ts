@@ -31,3 +31,10 @@ export interface ManualBackupSummary {
   backup: BackupManifest;
   remote: RemoteBackupOutcome;
 }
+
+export interface ImportString {
+  text: string;
+  addonCount: number;
+  /** "gist" is the list your other computers pushed; "local" was built from this computer's WowUp. */
+  source: "gist" | "local";
+}

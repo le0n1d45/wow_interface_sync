@@ -52,6 +52,21 @@ export function syncView(ctx: Ctx, flash?: string): HTMLElement {
     }, icon("pull"), "Pull from GitHub"),
   );
 
+  const copyOut = h("div");
+  const copyBtn = h("button", {
+    class: "btn",
+    onclick: async () => {
+      copyBtn.disabled = true;
+      const r = await window.sync.copyImportString();
+      copyBtn.disabled = false;
+      copyOut.replaceChildren(
+        r.ok
+          ? msg("ok", `Copied ${r.value.addonCount} addons to the clipboard${r.value.source === "local" ? " (built from this computer's WowUp)" : ""}. In WowUp, open My Addons, choose Import and paste.`)
+          : msg("err", r.error),
+      );
+    },
+  }, icon("copy"), "Copy WowUp import string");
+
   return h(
     "div",
     { class: "view" },
@@ -63,6 +78,13 @@ export function syncView(ctx: Ctx, flash?: string): HTMLElement {
       h("section", { class: "card action" }, h("div", { class: "icon" }, icon("push", 20)), h("h2", { textContent: "Push" }), h("p", { textContent: "Send this computer's addon settings, and refresh your WowUp addon list." }), push),
       h("section", { class: "card action" }, h("div", { class: "icon" }, icon("pull", 20)), h("h2", { textContent: "Pull" }), h("p", { textContent: "Apply the saved settings here. Anything that would change is backed up first, so you can undo it." }), pull),
     ),
+    h(
+      "section",
+      { class: "card import" },
+      h("div", { class: "import-text" }, h("h2", { textContent: "WowUp addon list" }), h("p", { textContent: "Copy your addon list to paste into WowUp's Import dialog on any computer." })),
+      copyBtn,
+    ),
+    copyOut,
     out,
   );
 }

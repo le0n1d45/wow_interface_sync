@@ -8,7 +8,7 @@ import { restoreBackup } from "../backup/restore";
 import { gitOut, hasSystemGit, startTestRemote, type TestRemote } from "../git/test-server";
 import { GIST_FILE_NAME } from "../gist/gist";
 import { decodeExportString } from "../wowup/export-string";
-import { pullAll, pushAll } from "./sync";
+import { getImportString, pullAll, pushAll } from "./sync";
 import type { SyncDeps } from "./sync.types";
 
 const SV = "WTF/Account/ACCT1/SavedVariables/Addon.lua";
@@ -50,12 +50,15 @@ async function machine(name: string, accountMap: Record<string, string> = {}, wi
     await put(wowupDir, "addons.json", JSON.stringify({ a: { name: "DBM", installationId: "i1", providerName: "CurseV2", externalId: "42", isIgnored: false } }));
   }
   const gistWrites: string[] = [];
+  let gistContent: string | undefined;
+  const reply = (body: unknown) => ({ status: 200, headers: { get: () => null }, json: async () => body, text: async () => "" });
   const fetchFn: FetchLike = async (_url, init) => {
     if (init.method === "PATCH") {
-      gistWrites.push(JSON.parse(init.body!).files[GIST_FILE_NAME].content);
-      return { status: 200, headers: { get: () => null }, json: async () => ({}) };
+      gistContent = JSON.parse(init.body!).files[GIST_FILE_NAME].content as string;
+      gistWrites.push(gistContent);
+      return reply({});
     }
-    return { status: 200, headers: { get: () => null }, json: async () => ({ files: {} }) };
+    return reply({ files: gistContent === undefined ? {} : { [GIST_FILE_NAME]: { content: gistContent } } });
   };
   return {
     root,
@@ -143,6 +146,29 @@ describe.skipIf(!hasSystemGit)("push on one machine, pull on another", () => {
     remote = undefined;
     const failed = await uploadBackup(b.deps, off.backupId!);
     expect(failed.status).toBe("failed");
+  });
+
+  it("gives a new computer the import string that another computer pushed", async () => {
+    remote = await startTestRemote({ empty: true });
+    const a = await machine("pc-a");
+    await put(a.forever, SV, "x");
+    await pushAll(a.deps);
+
+    // Same gist, different computer with no WowUp at all.
+    const fresh = await machine("pc-new", {}, false);
+    fresh.deps.fetchFn = a.deps.fetchFn;
+    const got = await getImportString(fresh.deps);
+    expect(got).toMatchObject({ source: "gist", addonCount: 1 });
+    expect(decodeExportString(got.text).addons[0]).toMatchObject({ id: "42", name: "DBM" });
+  });
+
+  it("falls back to this computer's WowUp when the gist is empty, and explains when neither exists", async () => {
+    remote = await startTestRemote({ empty: true });
+    const withWowUp = await machine("pc-a");
+    expect(await getImportString(withWowUp.deps)).toMatchObject({ source: "local", addonCount: 1 });
+
+    const bare = await machine("pc-b", {}, false);
+    await expect(getImportString(bare.deps)).rejects.toThrow(/gist has no addon list yet/);
   });
 
   it("does not fail the file sync when WowUp is missing; reports it instead", async () => {

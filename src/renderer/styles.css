@@ -144,6 +144,10 @@ details.adv summary { cursor: pointer; color: var(--muted); font-size: 12.5px; m
 .gap { height: 8px; }
 .check { display: flex; align-items: flex-start; gap: 9px; margin-top: 4px; font-size: 13px; }
 .check input { margin-top: 3px; accent-color: var(--accent); }
+.import { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.import h2 { margin-bottom: 2px; }
+.import .btn { white-space: nowrap; flex-shrink: 0; }
+.import p { margin: 0; color: var(--muted); font-size: 13px; }
 .title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .row-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .btn.danger-solid { background: var(--err); border-color: var(--err); color: #fff; }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FetchLike } from "../auth/token.types";
-import { GIST_FILE_NAME, updateGist } from "./gist";
+import { GIST_FILE_NAME, readGistFile, updateGist } from "./gist";
 
 interface Call { url: string; method?: string; body?: string; auth: string }
 
@@ -12,6 +12,7 @@ function fakeFetch(getStatus: number, files: unknown, patchStatus = 200, calls: 
       status: isPatch ? patchStatus : getStatus,
       headers: { get: () => null },
       json: async () => ({ files }),
+      text: async () => "",
     };
   };
 }
@@ -41,5 +42,27 @@ describe("updateGist", () => {
     await expect(updateGist("t", "g1", "X", fakeFetch(404, {}))).rejects.toThrow(/Gist not found/);
     await expect(updateGist("t", "g1", "X", fakeFetch(500, {}))).rejects.toThrow(/returned 500/);
     await expect(updateGist("t", "g1", "X", fakeFetch(200, {}, 403))).rejects.toThrow(/update the gist.*403/);
+  });
+});
+
+describe("readGistFile", () => {
+  it("returns the file content, or null when the gist has no such file", async () => {
+    expect(await readGistFile("t", "g", fakeFetch(200, { [GIST_FILE_NAME]: { content: "STRING" } }))).toBe("STRING");
+    expect(await readGistFile("t", "g", fakeFetch(200, { "other.txt": { content: "x" } }))).toBeNull();
+  });
+
+  it("follows raw_url when GitHub truncates a large file", async () => {
+    const f: FetchLike = async (url) => ({
+      status: 200,
+      headers: { get: () => null },
+      json: async () => ({ files: { [GIST_FILE_NAME]: { truncated: true, raw_url: "https://gist.raw/x" } } }),
+      text: async () => (url === "https://gist.raw/x" ? "FULL" : ""),
+    });
+    expect(await readGistFile("t", "g", f)).toBe("FULL");
+  });
+
+  it("explains a missing gist and other failures", async () => {
+    await expect(readGistFile("t", "g", fakeFetch(404, {}))).rejects.toThrow(/Gist not found/);
+    await expect(readGistFile("t", "g", fakeFetch(500, {}))).rejects.toThrow(/returned 500/);
   });
 });

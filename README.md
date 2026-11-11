@@ -32,6 +32,8 @@ Game settings are deliberately **not** synced: graphics and options (`Config.wtf
 
 ## WowUp export string
 
+On the Sync screen, **Copy WowUp import string** copies the list to your clipboard so you can paste it into WowUp (My Addons > Import), for example on a new computer.
+
 The app reads WowUp's own data folder (`addons.json` and `preferences.json`) and builds the same string WowUp's *Export* produces. In WowUp, import it from the gist's `wowup-forever.txt`. Only addons that WowUp tracks with a provider ID, and that are not ignored, are included. If WowUp's data folder is not found, the file sync still works and the export is skipped.
 
 A GitHub "secret" gist is unlisted, not access-controlled: anyone with the link can read it. The string holds addon names and IDs only.

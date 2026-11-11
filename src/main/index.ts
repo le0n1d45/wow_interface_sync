@@ -1,6 +1,6 @@
 import { hostname } from "node:os";
 import { dirname, join } from "node:path";
-import { app, BrowserWindow, ipcMain, Menu, nativeTheme, safeStorage } from "electron";
+import { app, BrowserWindow, clipboard, ipcMain, Menu, nativeTheme, safeStorage } from "electron";
 import { IPC, type SaveConfigResult, type SaveTokenResult } from "@shared/ipc.types";
 import type { Result } from "@shared/sync.types";
 import type { AppConfig } from "@shared/config.types";
@@ -10,7 +10,7 @@ import { clearToken, loadToken, saveToken, tokenStatus } from "./auth/token-stor
 import { deleteBackup, listBackups } from "./backup/backup";
 import { createManualBackup } from "./backup/manual";
 import { restoreBackup } from "./backup/restore";
-import { manualBackup, pullAll, pushAll, wipeRepo } from "./sync/sync";
+import { getImportString, manualBackup, pullAll, pushAll, wipeRepo } from "./sync/sync";
 import type { SyncDeps } from "./sync/sync.types";
 import { detectForeverInstall, resolveForeverDir } from "./wow/install";
 import { assertWowClosed, isWowRunning } from "./wow/process";
@@ -62,6 +62,13 @@ function registerIpc(): void {
   });
   ipcMain.handle(IPC.syncPush, () => guard(async () => pushAll(await syncDeps())));
   ipcMain.handle(IPC.syncPull, () => guard(async () => pullAll(await syncDeps())));
+  ipcMain.handle(IPC.copyImportString, () =>
+    guard(async () => {
+      const { text, ...info } = await getImportString(await syncDeps());
+      clipboard.writeText(text); // copied in the main process: the clipboard API needs no page permission there
+      return info;
+    }),
+  );
   ipcMain.handle(IPC.repoWipe, () => guard(async () => wipeRepo(await syncDeps())));
   ipcMain.handle(IPC.backupsList, () => listBackups(backupsDir()));
   ipcMain.handle(IPC.backupsRestore, (_evt, id: string) =>

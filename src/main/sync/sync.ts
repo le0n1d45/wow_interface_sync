@@ -1,13 +1,14 @@
 import { join } from "node:path";
-import { updateGist } from "../gist/gist";
+import { readGistFile, updateGist } from "../gist/gist";
 import { deleteAllFiles, pushFiles, syncClone } from "../git/repo";
+import type { ImportString } from "@shared/sync.types";
 import { readManifest } from "../backup/backup";
 import { createManualBackup } from "../backup/manual";
 import { pullIntoInstall } from "../backup/pull";
 import { pushBackup } from "../backup/remote";
 import { resolveForeverDir } from "../wow/install";
 import { selectSyncFiles } from "../wow/sync-files";
-import { encodeExportString, readForeverExport } from "../wowup/export-string";
+import { decodeExportString, encodeExportString, readForeverExport } from "../wowup/export-string";
 import { locateWowUpData } from "../wowup/locate";
 import type { GistOutcome, ManualBackupSummary, PullSummary, PushSummary, RemoteBackupOutcome, SyncDeps } from "./sync.types";
 
@@ -88,4 +89,23 @@ export async function manualBackup(d: SyncDeps): Promise<ManualBackupSummary> {
 /** Deletes every file in the sync repo (settings and uploaded backups) in one commit. Local files are not touched. */
 export async function wipeRepo(d: SyncDeps): Promise<{ removedFiles: number }> {
   return deleteAllFiles(repoOptions(d), `Delete all data (requested from ${d.hostname} at ${new Date().toISOString()})`);
+}
+
+/**
+ * The WowUp import string to paste into WowUp's Import dialog. Prefers the gist, which holds the list your
+ * other computers pushed (what a new computer needs); falls back to this computer's own WowUp data.
+ */
+export async function getImportString(d: SyncDeps): Promise<ImportString> {
+  const fromGist = await readGistFile(d.token, d.config.gistId, d.fetchFn);
+  if (fromGist?.trim()) {
+    const text = fromGist.trim();
+    return { text, addonCount: decodeExportString(text).addons.length, source: "gist" };
+  }
+  const dataDir = await locateWowUpData(d.installEnv, d.wowupDataDir);
+  if (!dataDir) {
+    throw new Error("The gist has no addon list yet. Push from a computer that has WowUp first, then try again.");
+  }
+  const foreverDir = await requireForeverDir(d);
+  const payload = await readForeverExport(dataDir, foreverDir);
+  return { text: encodeExportString(payload), addonCount: payload.addons.length, source: "local" };
 }

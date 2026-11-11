@@ -12,6 +12,7 @@ function fakeFetch(routes: Record<string, Route>, seen: string[] = []): FetchLik
       status: r.status,
       headers: { get: (n) => (n.toLowerCase() === "x-oauth-scopes" ? (r.scopes ?? null) : null) },
       json: async () => r.body,
+      text: async () => String(r.body ?? ""),
     };
   };
 }
