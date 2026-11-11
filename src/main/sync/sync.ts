@@ -67,6 +67,7 @@ export async function pullAll(d: SyncDeps): Promise<PullSummary> {
   await d.assertWowClosed();
   const foreverDir = await requireForeverDir(d);
   const opts = repoOptions(d);
+  d.onProgress?.({ stage: "settings" });
   await syncClone(opts);
   const result = await pullIntoInstall({
     cloneDir: opts.cloneDir,
@@ -93,6 +94,7 @@ export async function installAddonsFromGist(d: SyncDeps, foreverDir: string): Pr
       api: new CurseForgeClient(d.curseKey, d.fetchFn, d.download),
       addonsDir: join(foreverDir, "Interface", "AddOns"),
       stagingDir: join(d.dataDir, "staging"),
+      onProgress: d.onProgress,
     });
     return { status: "done", summary };
   } catch (e) {

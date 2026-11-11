@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { strToU8, zipSync } from "fflate";
@@ -56,20 +57,20 @@ describe("CurseForgeClient", () => {
       seen = { url, key: init.headers["x-api-key"] };
       return reply(200, { data: { id: 5, name: "X", allowModDistribution: true, latestFiles: [] } });
     };
-    const m = await new CurseForgeClient("KEY", f, async () => new Uint8Array()).getMod(5);
+    const m = await new CurseForgeClient("KEY", f, async () => {}).getMod(5);
     expect(m.name).toBe("X");
     expect(seen).toEqual({ url: "https://api.curseforge.com/v1/mods/5", key: "KEY" });
   });
 
   it("explains 404, a rejected key and other errors", async () => {
-    const c = (s: number) => new CurseForgeClient("K", () => reply(s, {}), async () => new Uint8Array());
+    const c = (s: number) => new CurseForgeClient("K", () => reply(s, {}), async () => {});
     await expect(c(404).getMod(1)).rejects.toThrow(/Not found/);
     await expect(c(403).getMod(1)).rejects.toThrow(/rejected the API key/);
     await expect(c(500).getMod(1)).rejects.toThrow(/returned 500/);
   });
 
   it("validates a key", async () => {
-    const v = (s: number) => new CurseForgeClient("K", () => reply(s, {}), async () => new Uint8Array()).validateKey();
+    const v = (s: number) => new CurseForgeClient("K", () => reply(s, {}), async () => {}).validateKey();
     expect(await v(200)).toEqual({ ok: true });
     expect((await v(403)).ok).toBe(false);
     expect((await v(500)).problem).toMatch(/500/);
@@ -78,25 +79,35 @@ describe("CurseForgeClient", () => {
 
 describe("zip extraction", () => {
   let dir: string;
+  let out: string;
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "wis-zip-"));
+    out = join(dir, "out");
   });
   afterEach(() => rm(dir, { recursive: true, force: true }));
 
+  /** Writes zip bytes to a file and extracts them, like the installer does after a download. */
+  async function extract(bytes: Uint8Array): Promise<string[]> {
+    const file = join(dir, "addon.zip");
+    await writeFile(file, bytes);
+    return extractAddonZip(file, out);
+  }
+
   it("extracts addon folders and reports their names", async () => {
-    const names = await extractAddonZip(zip({ "Addon/Addon.toc": "## Title: A", "Addon/Core.lua": "x", "Addon_Options/Options.lua": "y" }), dir);
+    const names = await extract(zip({ "Addon/Addon.toc": "## Title: A", "Addon/Core.lua": "x", "Addon_Options/Options.lua": "y" }));
     expect(names).toEqual(["Addon", "Addon_Options"]);
-    expect(await readFile(join(dir, "Addon", "Core.lua"), "utf8")).toBe("x");
+    expect(await readFile(join(out, "Addon", "Core.lua"), "utf8")).toBe("x");
   });
 
   it("rejects path traversal and writes nothing", async () => {
-    await expect(extractAddonZip(zip({ "Addon/ok.lua": "x", "Addon/../../evil.lua": "y" }), dir)).rejects.toThrow(/Unsafe path/);
-    expect(await readdir(dir)).toEqual([]);
+    await expect(extract(zip({ "Addon/ok.lua": "x", "Addon/../../evil.lua": "y" }))).rejects.toThrow(/relative path|Unsafe path/);
+    expect(await readdir(dir)).not.toContain("evil.lua");
+    expect(await readdir(join(dir, ".."))).not.toContain("evil.lua");
   });
 
   it("rejects loose top-level files and empty zips", async () => {
-    await expect(extractAddonZip(zip({ "readme.txt": "x" }), dir)).rejects.toThrow(/top level/);
-    await expect(extractAddonZip(zipSync({}), dir)).rejects.toThrow(/no addon folders/);
+    await expect(extract(zip({ "readme.txt": "x" }))).rejects.toThrow(/top level/);
+    await expect(extract(zipSync({}))).rejects.toThrow(/no addon folders/);
   });
 
   it("flags unsafe entry names", () => {
@@ -129,11 +140,13 @@ describe("installMissingAddons", () => {
         if (m instanceof Error) throw m;
         return m;
       },
-      async download(url) {
+      async download(url, dest, onBytes) {
         downloads.push(url);
         const z = zips[url];
         if (!z) throw new Error("Download failed (404).");
-        return z;
+        await mkdir(dirname(dest), { recursive: true });
+        await writeFile(dest, z);
+        onBytes?.(z.byteLength, z.byteLength);
       },
     };
   }
@@ -145,7 +158,7 @@ describe("installMissingAddons", () => {
     const s = await installMissingAddons(payload(entry("1", "DBM")), opts(a));
     expect(s.installed).toEqual(["DBM"]);
     expect(await readFile(join(addons, "DBM-Core", "x.lua"), "utf8")).toBe("x");
-    expect(await readdir(staging)).toEqual([]);
+    expect(await readdir(staging)).toEqual([]); // no temp zip or folder left behind
   });
 
   it("never overwrites: skips an addon whose folder already exists, without downloading", async () => {
@@ -203,12 +216,42 @@ describe("installMissingAddons", () => {
     expect(downloads).toEqual(["https://cdn/21.zip"]);
   });
 
-  it("creates the AddOns folder when it does not exist yet, and reports progress", async () => {
+  it("creates the AddOns folder when it does not exist yet", async () => {
     await rm(addons, { recursive: true, force: true });
     const a = api({ "30": mod(30, "New", { modules: [{ name: "New" }] }) }, { "https://cdn/30.zip": zip({ "New/New.toc": "t" }) });
-    const progress: string[] = [];
-    await installMissingAddons(payload(entry("30", "New")), { ...opts(a), onProgress: (d, t, n) => progress.push(`${d}/${t}:${n}`) });
+    await installMissingAddons(payload(entry("30", "New")), opts(a));
     expect((await readdir(addons)).sort()).toEqual(["New"]);
-    expect(progress).toEqual(["0/1:New", "1/1:"]);
+  });
+
+  it("reports progress: each addon's step and its download bytes, with the file size from CurseForge as a fallback", async () => {
+    const a = api(
+      { "40": mod(40, "Big Voice Pack", { modules: [{ name: "Voices" }], fileLength: 1234 }), "41": mod(41, "Small", { modules: [{ name: "Small" }] }) },
+      { "https://cdn/40.zip": zip({ "Voices/v.lua": "x" }), "https://cdn/41.zip": zip({ "Small/s.lua": "y" }) },
+    );
+    const events: string[] = [];
+    await installMissingAddons(payload(entry("40", "Big"), entry("41", "Small")), {
+      ...opts(a),
+      onProgress: (p) => events.push(`${p.index + 1}/${p.total} ${p.step} ${p.name} ${p.received}/${p.size}`),
+    });
+    expect(events[0]).toBe("1/2 checking Big 0/null");
+    expect(events).toContain("1/2 downloading Big Voice Pack 0/1234"); // size known before the first byte
+    // The size the server reports during the download wins over CurseForge's listed length.
+    expect(events.some((e) => /^1\/2 downloading Big Voice Pack ([1-9]\d*)\/\1$/.test(e))).toBe(true);
+    expect(events).toContain("1/2 extracting Big Voice Pack 1234/1234");
+    expect(events.filter((e) => e.startsWith("2/2")).map((e) => e.split(" ")[1])).toEqual(["checking", "downloading", "downloading", "extracting"]);
+  });
+
+  it("falls back to CurseForge's listed size when the server sends no Content-Length", async () => {
+    const a: CurseApi = {
+      getMod: async () => mod(50, "Voices", { modules: [{ name: "Voices" }], fileLength: 1234 }),
+      async download(_url, dest, onBytes) {
+        onBytes?.(500, null); // server gave no total
+        await mkdir(dirname(dest), { recursive: true });
+        await writeFile(dest, zip({ "Voices/v.lua": "x" }));
+      },
+    };
+    const events: string[] = [];
+    await installMissingAddons(payload(entry("50", "Voices")), { ...opts(a), onProgress: (p) => events.push(`${p.step} ${p.received}/${p.size}`) });
+    expect(events).toContain("downloading 500/1234");
   });
 });

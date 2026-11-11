@@ -1,6 +1,6 @@
 import type { AppConfig, ConfigIssue } from "./config.types";
 import type { BackupManifest } from "../main/backup/backup.types";
-import type { ImportString, ManualBackupSummary, PullSummary, PushSummary, Result } from "./sync.types";
+import type { ImportString, ManualBackupSummary, PullSummary, PushSummary, Result, SyncProgress } from "./sync.types";
 import type { TokenProtection, TokenStatus } from "./token.types";
 
 export const IPC = {
@@ -11,6 +11,7 @@ export const IPC = {
   tokenClear: "token:clear",
   syncPush: "sync:push",
   syncPull: "sync:pull",
+  syncProgress: "sync:progress",
   backupsList: "backups:list",
   backupsRestore: "backups:restore",
   repoWipe: "repo:wipe",
@@ -46,6 +47,8 @@ export interface SyncApi {
   clearToken(): Promise<void>;
   push(): Promise<Result<PushSummary>>;
   pull(): Promise<Result<PullSummary>>;
+  /** Subscribes to live pull progress. Returns a function that unsubscribes. */
+  onProgress(callback: (progress: SyncProgress) => void): () => void;
   listBackups(): Promise<BackupManifest[]>;
   /** Restores a backup; returns the id of the safety backup that makes the restore undoable. */
   restoreBackup(id: string): Promise<Result<string>>;

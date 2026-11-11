@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { ExportPayload } from "../wowup/wowup.types";
 import { pickForeverFile } from "./curseforge";
 import type { AddonInstallSummary, CurseApi } from "./addons.types";
+import type { SyncProgress } from "@shared/sync.types";
 import { extractAddonZip } from "./zip";
 
 const CURSE_PROVIDERS = new Set(["Curse", "CurseV2"]);
@@ -13,7 +14,7 @@ export interface InstallOptions {
   addonsDir: string;
   /** Scratch folder; each addon is extracted here first, then moved into place. */
   stagingDir: string;
-  onProgress?: (done: number, total: number, name: string) => void;
+  onProgress?: (p: Extract<SyncProgress, { stage: "addons" }>) => void;
 }
 
 async function listFolders(dir: string): Promise<Set<string>> {
@@ -56,12 +57,16 @@ export async function installMissingAddons(payload: ExportPayload, opts: Install
 
   let done = 0;
   for (const entry of entries) {
-    opts.onProgress?.(done++, entries.length, entry.name);
+    const index = done++;
+    const report = (step: "checking" | "downloading" | "extracting", name: string, received = 0, size: number | null = null) =>
+      opts.onProgress?.({ stage: "addons", name, index, total: entries.length, step, received, size });
+    report("checking", entry.name);
     if (!CURSE_PROVIDERS.has(entry.provider_name)) {
       summary.needManual.push({ name: entry.name, reason: `Comes from ${entry.provider_name}, which this app can't download from. Install it in WowUp.` });
       continue;
     }
     const stage = join(opts.stagingDir, `${entry.id}-${Date.now()}`);
+    const zipFile = `${stage}.zip`;
     try {
       const mod = await opts.api.getMod(Number(entry.id));
       const file = pickForeverFile(mod);
@@ -82,7 +87,10 @@ export async function installMissingAddons(payload: ExportPayload, opts: Install
         continue;
       }
 
-      const folders = await extractAddonZip(await opts.api.download(file.downloadUrl), stage);
+      report("downloading", mod.name, 0, file.fileLength ?? null);
+      await opts.api.download(file.downloadUrl, zipFile, (received, total) => report("downloading", mod.name, received, total ?? file.fileLength ?? null));
+      report("extracting", mod.name, file.fileLength ?? 0, file.fileLength ?? null);
+      const folders = await extractAddonZip(zipFile, stage);
       if (folders.some((f) => present.has(f.toLowerCase()))) {
         summary.alreadyPresent++; // the zip holds a folder we already have: still never overwrite
         continue;
@@ -96,8 +104,8 @@ export async function installMissingAddons(payload: ExportPayload, opts: Install
       summary.needManual.push({ name: entry.name, reason: `${(e as Error).message} Install it in WowUp.` });
     } finally {
       await rm(stage, { recursive: true, force: true });
+      await rm(zipFile, { force: true });
     }
   }
-  opts.onProgress?.(entries.length, entries.length, "");
   return summary;
 }

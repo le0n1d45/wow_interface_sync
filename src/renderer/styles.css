@@ -157,3 +157,14 @@ details.adv summary { cursor: pointer; color: var(--muted); font-size: 12.5px; m
 .modal h2 { margin: 0 0 8px; font-size: 16px; }
 .modal p { margin: 0 0 18px; color: var(--muted); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.progress { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); }
+.p-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.p-title { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.p-side { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.progress > .track { flex: none; }
+.p-row .track { flex: 1; }
+.track { position: relative; height: 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
+.fill { height: 100%; width: 0; background: var(--accent); border-radius: 999px; transition: width .15s ease-out; }
+.track.indeterminate .fill { width: 35%; animation: slide 1.1s ease-in-out infinite; }
+@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+@media (prefers-reduced-motion: reduce) { .fill { transition: none; } .track.indeterminate .fill { animation: none; width: 100%; opacity: .4; } }

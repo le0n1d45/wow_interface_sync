@@ -1,6 +1,6 @@
 import type { AppConfig } from "@shared/config.types";
 import type { BackupManifest } from "../main/backup/backup.types";
-import type { AddonInstallOutcome, PushSummary, RemoteBackupOutcome } from "@shared/sync.types";
+import type { AddonInstallOutcome, PushSummary, RemoteBackupOutcome, SyncProgress } from "@shared/sync.types";
 
 export function parseAccountMap(text: string): Record<string, string> {
   const map: Record<string, string> = {};
@@ -65,4 +65,51 @@ export function describeAddonInstall(o: AddonInstallOutcome): Note | null {
   const text = parts.length ? `Addons: ${parts.join(", ")}.` : "Addons: nothing to install.";
   const details = [...installed.map((n) => `+ ${n}`), ...needManual.map((m) => `! ${m.name}: ${m.reason}`)];
   return { kind: needManual.length ? "warn" : "ok", text: installed.length ? `${text} Rescan in WowUp to see them.` : text, details };
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return `${value >= 100 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`;
+}
+
+export interface ProgressView {
+  title: string;
+  /** e.g. "Addon 3 of 27" */
+  position: string | null;
+  /** 0..1, or null when it cannot be known (shown as an animated bar). */
+  overall: number | null;
+  /** The current download, 0..1, or null when there is no download or its size is unknown. */
+  download: number | null;
+  /** e.g. "48.2 MB of 310 MB" */
+  bytes: string | null;
+}
+
+/** How far along a pull is, for the progress panel. */
+export function describeProgress(p: SyncProgress): ProgressView {
+  if (p.stage === "settings") return { title: "Applying your saved settings...", position: null, overall: null, download: null, bytes: null };
+
+  const downloadFraction = p.step === "downloading" && p.size ? Math.min(1, p.received / p.size) : null;
+  // Within one addon: look it up (0%), download (10% to 90%), unpack (90% to 100%).
+  const within = p.step === "checking" ? 0 : p.step === "extracting" ? 0.9 : 0.1 + 0.8 * (downloadFraction ?? 0);
+  const title = { checking: "Checking", downloading: "Downloading", extracting: "Installing" }[p.step];
+  const bytes =
+    p.step === "downloading" && p.received > 0
+      ? p.size
+        ? `${formatBytes(p.received)} of ${formatBytes(p.size)}`
+        : formatBytes(p.received)
+      : null;
+  return {
+    title: `${title} ${p.name}`,
+    position: `Addon ${p.index + 1} of ${p.total}`,
+    overall: (p.index + within) / p.total,
+    download: downloadFraction,
+    bytes,
+  };
 }

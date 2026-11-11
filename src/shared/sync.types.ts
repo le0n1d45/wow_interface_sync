@@ -55,3 +55,19 @@ export type AddonInstallOutcome =
   | { status: "done"; summary: AddonInstallSummary }
   | { status: "skipped"; reason: string }
   | { status: "failed"; reason: string };
+
+/** Live progress of a pull, sent to the window while it runs. */
+export type SyncProgress =
+  | { stage: "settings" }
+  | {
+      stage: "addons";
+      /** The addon being worked on. */
+      name: string;
+      /** 0-based position among the addons to process, and how many there are. */
+      index: number;
+      total: number;
+      step: "checking" | "downloading" | "extracting";
+      /** Bytes downloaded so far and the file's size, when known. */
+      received: number;
+      size: number | null;
+    };

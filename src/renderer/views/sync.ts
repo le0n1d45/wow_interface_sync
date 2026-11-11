@@ -1,5 +1,6 @@
 import { h, msg, msgs } from "../dom";
 import { icon } from "../icons";
+import { progressPanel } from "../progress";
 import type { Ctx } from "../context";
 import { describeAddonInstall, describePull, describePush, describeRemoteBackup } from "../format";
 import { repoLabel, shortPath } from "../setup";
@@ -27,8 +28,10 @@ export function syncView(ctx: Ctx, flash?: string): HTMLElement {
     h("button", {
       class: "btn block",
       onclick: async () => {
-        out.replaceChildren(msg("info", "Pulling settings..."));
-        const r = await ctx.withBusy(() => window.sync.pull());
+        const panel = progressPanel("Starting...");
+        out.replaceChildren(panel.el);
+        const stopListening = window.sync.onProgress(panel.update);
+        const r = await ctx.withBusy(() => window.sync.pull()).finally(stopListening);
         if (!r.ok) {
           out.replaceChildren(msg("err", r.error));
           return;
@@ -76,8 +79,9 @@ export function syncView(ctx: Ctx, flash?: string): HTMLElement {
       "div",
       { class: "actions" },
       h("section", { class: "card action" }, h("div", { class: "icon" }, icon("push", 20)), h("h2", { textContent: "Push" }), h("p", { textContent: "Send this computer's addon settings, and refresh your WowUp addon list." }), push),
-      h("section", { class: "card action" }, h("div", { class: "icon" }, icon("pull", 20)), h("h2", { textContent: "Pull" }), h("p", { textContent: "Apply the saved settings here and install any missing addons. Changed files are backed up first, so you can undo it." }), pull),
+      h("section", { class: "card action" }, h("div", { class: "icon" }, icon("pull", 20)), h("h2", { textContent: "Pull" }), h("p", { textContent: "Apply the saved settings here and install missing addons. Changes are backed up first." }), pull),
     ),
+    out,
     h(
       "section",
       { class: "card import" },
@@ -85,6 +89,5 @@ export function syncView(ctx: Ctx, flash?: string): HTMLElement {
       copyBtn,
     ),
     copyOut,
-    out,
   );
 }

@@ -2,11 +2,12 @@ import { hostname } from "node:os";
 import { dirname, join } from "node:path";
 import { app, BrowserWindow, clipboard, ipcMain, Menu, nativeTheme, safeStorage } from "electron";
 import { IPC, type SaveConfigResult, type SaveTokenResult } from "@shared/ipc.types";
-import type { Result } from "@shared/sync.types";
+import type { Result, SyncProgress } from "@shared/sync.types";
 import type { AppConfig } from "@shared/config.types";
 import { validateToken } from "./auth/github-validate";
 import type { FetchLike } from "./auth/token.types";
 import { CurseForgeClient } from "./addons/curseforge";
+import { downloadToFile } from "./addons/download";
 import { clearToken, CURSE_KEY_FILE_NAME, loadToken, saveToken, tokenStatus } from "./auth/token-store";
 import { deleteBackup, listBackups } from "./backup/backup";
 import { createManualBackup } from "./backup/manual";
@@ -28,13 +29,7 @@ async function guard<T>(fn: () => Promise<T>): Promise<Result<T>> {
   }
 }
 
-async function downloadBytes(url: string): Promise<Uint8Array> {
-  const res = await fetch(url, { headers: { "User-Agent": "wow-interface-sync" } });
-  if (!res.ok) throw new Error(`Download failed (${res.status}).`);
-  return new Uint8Array(await res.arrayBuffer());
-}
-
-async function syncDeps(): Promise<SyncDeps> {
+async function syncDeps(onProgress?: (p: SyncProgress) => void): Promise<SyncDeps> {
   const config = await loadConfig(configDir());
   const issues = validateConfig(config);
   if (issues.length > 0) throw new Error(`Finish the settings first: ${issues.map((i) => i.message).join("; ")}`);
@@ -47,9 +42,27 @@ async function syncDeps(): Promise<SyncDeps> {
     installEnv: { platform: process.platform, env: process.env },
     fetchFn: fetch as unknown as FetchLike,
     curseKey: await loadToken(configDir(), safeStorage, CURSE_KEY_FILE_NAME),
-    download: downloadBytes,
+    download: downloadToFile,
+    onProgress,
     assertWowClosed: () => assertWowClosed(),
     hostname: hostname(),
+  };
+}
+
+/**
+ * Forwards progress to the window. Download byte counts arrive many times a second, so those are sent at
+ * most every 100 ms; a change of addon or step is always sent right away.
+ */
+function progressSender(send: (p: SyncProgress) => void): (p: SyncProgress) => void {
+  let lastKey = "";
+  let lastSent = 0;
+  return (p) => {
+    const key = p.stage === "addons" ? `${p.index}:${p.step}` : p.stage;
+    const now = Date.now();
+    if (key === lastKey && now - lastSent < 100) return;
+    lastKey = key;
+    lastSent = now;
+    send(p);
   };
 }
 
@@ -70,11 +83,13 @@ function registerIpc(): void {
     return { ok: true, login: check.login, problems: [], protection: stored.protection };
   });
   ipcMain.handle(IPC.syncPush, () => guard(async () => pushAll(await syncDeps())));
-  ipcMain.handle(IPC.syncPull, () => guard(async () => pullAll(await syncDeps())));
+  ipcMain.handle(IPC.syncPull, (evt) =>
+    guard(async () => pullAll(await syncDeps(progressSender((p) => evt.sender.send(IPC.syncProgress, p))))),
+  );
   ipcMain.handle(IPC.curseKeyStatus, () => tokenStatus(configDir(), CURSE_KEY_FILE_NAME));
   ipcMain.handle(IPC.curseKeyClear, () => clearToken(configDir(), CURSE_KEY_FILE_NAME));
   ipcMain.handle(IPC.curseKeySave, async (_evt, key: string) => {
-    const check = await new CurseForgeClient(key.trim(), fetch as unknown as FetchLike, downloadBytes).validateKey();
+    const check = await new CurseForgeClient(key.trim(), fetch as unknown as FetchLike, downloadToFile).validateKey();
     if (check.ok) await saveToken(configDir(), key.trim(), safeStorage, CURSE_KEY_FILE_NAME);
     return check;
   });

@@ -9,6 +9,11 @@ const api: SyncApi = {
   clearToken: () => ipcRenderer.invoke(IPC.tokenClear),
   push: () => ipcRenderer.invoke(IPC.syncPush),
   pull: () => ipcRenderer.invoke(IPC.syncPull),
+  onProgress: (callback) => {
+    const listener = (_evt: Electron.IpcRendererEvent, progress: Parameters<typeof callback>[0]) => callback(progress);
+    ipcRenderer.on(IPC.syncProgress, listener);
+    return () => ipcRenderer.removeListener(IPC.syncProgress, listener);
+  },
   listBackups: () => ipcRenderer.invoke(IPC.backupsList),
   restoreBackup: (id) => ipcRenderer.invoke(IPC.backupsRestore, id),
   getCurseKeyStatus: () => ipcRenderer.invoke(IPC.curseKeyStatus),

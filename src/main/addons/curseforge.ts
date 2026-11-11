@@ -1,12 +1,10 @@
 import type { FetchLike } from "../auth/token.types";
-import type { CfFile, CfMod, CurseApi } from "./addons.types";
+import type { ByteProgress, CfFile, CfMod, CurseApi } from "./addons.types";
 
 const API = "https://api.curseforge.com/v1";
 
 /** CurseForge's game version type id for WoW Forever (the same id WowUp filters on). */
 export const FOREVER_GAME_VERSION_TYPE_ID = 88568;
-
-const MAX_DOWNLOAD_BYTES = 200 * 1024 * 1024;
 
 /**
  * The file to install: the newest one built for WoW Forever, preferring stable releases and
@@ -22,7 +20,7 @@ export class CurseForgeClient implements CurseApi {
   constructor(
     private readonly apiKey: string,
     private readonly fetchFn: FetchLike,
-    private readonly downloadFn: (url: string) => Promise<Uint8Array>,
+    private readonly downloadFn: (url: string, destFile: string, onBytes?: ByteProgress) => Promise<void>,
   ) {}
 
   private headers() {
@@ -37,10 +35,8 @@ export class CurseForgeClient implements CurseApi {
     return ((await res.json()) as { data: CfMod }).data;
   }
 
-  async download(url: string): Promise<Uint8Array> {
-    const bytes = await this.downloadFn(url);
-    if (bytes.byteLength > MAX_DOWNLOAD_BYTES) throw new Error("The download is unexpectedly large.");
-    return bytes;
+  download(url: string, destFile: string, onBytes?: ByteProgress): Promise<void> {
+    return this.downloadFn(url, destFile, onBytes);
   }
 
   /** True when CurseForge accepts the key. */

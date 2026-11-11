@@ -1,9 +1,11 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { unzipSync } from "fflate";
+import { pipeline } from "node:stream/promises";
+import yauzl from "yauzl";
 
-const MAX_TOTAL_BYTES = 500 * 1024 * 1024;
-const MAX_ENTRIES = 20000;
+const MAX_TOTAL_BYTES = 8 * 1024 * 1024 * 1024;
+const MAX_ENTRIES = 100000;
 
 /** Validates a zip entry path: relative, forward-slash, no "." or ".." segments. Returns its segments. */
 export function safeEntrySegments(name: string): string[] {
@@ -14,37 +16,59 @@ export function safeEntrySegments(name: string): string[] {
   return segments;
 }
 
+function openZip(path: string): Promise<yauzl.ZipFile> {
+  return new Promise((resolve, reject) =>
+    yauzl.open(path, { lazyEntries: true, autoClose: true, strictFileNames: false }, (err, zip) => (err ? reject(err) : resolve(zip))),
+  );
+}
+
+function openEntry(zip: yauzl.ZipFile, entry: yauzl.Entry): Promise<NodeJS.ReadableStream> {
+  return new Promise((resolve, reject) => zip.openReadStream(entry, (err, stream) => (err ? reject(err) : resolve(stream))));
+}
+
 /**
- * Extracts an addon zip into `destDir` and returns the top-level folder names it created.
+ * Extracts an addon zip file into `destDir`, one entry at a time straight from disk, so even a very large
+ * addon never sits in memory. Returns the top-level folder names it created.
  * Addon zips must hold folders at the top level (one folder per addon); anything else is rejected.
  */
-export async function extractAddonZip(zip: Uint8Array, destDir: string): Promise<string[]> {
+export async function extractAddonZip(zipPath: string, destDir: string): Promise<string[]> {
+  const zip = await openZip(zipPath);
+  const topLevel = new Set<string>();
   let total = 0;
   let count = 0;
-  const files = unzipSync(zip, {
-    filter(file) {
-      count++;
-      total += file.originalSize;
-      if (count > MAX_ENTRIES || total > MAX_TOTAL_BYTES) throw new Error("The zip is unexpectedly large.");
-      return true;
-    },
+
+  await new Promise<void>((resolve, reject) => {
+    const fail = (e: unknown) => {
+      zip.close();
+      reject(e);
+    };
+    zip.on("error", fail);
+    zip.on("end", resolve);
+    zip.on("entry", (entry: yauzl.Entry) => {
+      void (async () => {
+        count++;
+        total += entry.uncompressedSize;
+        if (count > MAX_ENTRIES || total > MAX_TOTAL_BYTES) throw new Error("The zip is unexpectedly large.");
+
+        const segments = safeEntrySegments(entry.fileName);
+        const isDirectory = entry.fileName.endsWith("/");
+        if (segments.length > 0) {
+          if (segments.length === 1 && !isDirectory) throw new Error(`Unexpected file at the top level of the zip: ${entry.fileName}`);
+          topLevel.add(segments[0]);
+        }
+        if (!isDirectory && segments.length > 0) {
+          const target = join(destDir, ...segments);
+          await mkdir(dirname(target), { recursive: true });
+          await pipeline(await openEntry(zip, entry), createWriteStream(target));
+        } else if (segments.length > 0) {
+          await mkdir(join(destDir, ...segments), { recursive: true });
+        }
+        zip.readEntry();
+      })().catch(fail);
+    });
+    zip.readEntry();
   });
 
-  const topLevel = new Set<string>();
-  const writes: [string, Uint8Array][] = [];
-  for (const [name, data] of Object.entries(files)) {
-    const segments = safeEntrySegments(name);
-    if (segments.length === 0) continue;
-    const isDirectory = name.endsWith("/");
-    if (segments.length === 1 && !isDirectory) throw new Error(`Unexpected file at the top level of the zip: ${name}`);
-    topLevel.add(segments[0]);
-    if (!isDirectory) writes.push([join(destDir, ...segments), data]);
-  }
   if (topLevel.size === 0) throw new Error("The zip contains no addon folders.");
-
-  for (const [path, data] of writes) {
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, data);
-  }
   return [...topLevel].sort();
 }

@@ -190,9 +190,12 @@ describe.skipIf(!hasSystemGit)("push on one machine, pull on another", () => {
       return a.deps.fetchFn(url, init); // the gist
     };
     const downloads: string[] = [];
-    b.deps.download = async (url) => {
+    b.deps.download = async (url, dest, onBytes) => {
       downloads.push(url);
-      return zipSync({ "DBM-Core/DBM-Core.toc": strToU8("## Title: DBM") });
+      const bytes = zipSync({ "DBM-Core/DBM-Core.toc": strToU8("## Title: DBM") });
+      await mkdir(dirname(dest), { recursive: true });
+      await writeFile(dest, bytes);
+      onBytes?.(bytes.length, bytes.length);
     };
 
     // Off by default: nothing downloaded, nothing said.
@@ -206,7 +209,11 @@ describe.skipIf(!hasSystemGit)("push on one machine, pull on another", () => {
 
     // On with a key: installs into Interface/AddOns, and a second pull leaves it alone.
     b.deps.curseKey = "KEY";
+    const progress: string[] = [];
+    b.deps.onProgress = (p) => progress.push(p.stage === "settings" ? "settings" : `${p.index + 1}/${p.total} ${p.step}`);
     const on = await pullAll(b.deps);
+    expect(progress[0]).toBe("settings");
+    expect(progress).toContain("1/1 downloading");
     expect(on.addons).toEqual({ status: "done", summary: { installed: ["DBM"], alreadyPresent: 0, ignored: 0, needManual: [] } });
     expect(await (await import("node:fs/promises")).readFile(join(b.forever, "Interface", "AddOns", "DBM-Core", "DBM-Core.toc"), "utf8")).toBe("## Title: DBM");
     const again = await pullAll(b.deps);

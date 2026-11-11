@@ -14,9 +14,11 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "@types/yauzl": "^3.4.0",
     "electron": "^45.3.0",
     "electron-builder": "^26.18.0",
     "electron-vite": "^6.0.0",
+    "fflate": "^0.8.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
     "vitest": "^4.1.12"
@@ -24,8 +26,8 @@
   "author": "Le0n1d45",
   "homepage": "https://github.com/le0n1d45/wow_interface_sync",
   "dependencies": {
-    "fflate": "^0.8.3",
-    "isomorphic-git": "^1.44.12"
+    "isomorphic-git": "^1.44.12",
+    "yauzl": "^3.4.0"
   },
   "license": "MIT"
 }
