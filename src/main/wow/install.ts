@@ -1,5 +1,5 @@
 import { stat } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, join, posix, win32 } from "node:path";
 import type { InstallEnv } from "./wow.types";
 
 export const FOREVER_FOLDER = "_forever_";
@@ -14,16 +14,17 @@ async function isDirectory(path: string): Promise<boolean> {
 
 /** Default install locations to probe, per platform. Linux has no standard one (Wine/Lutris), so the user picks. */
 export function candidateRoots({ platform, env }: InstallEnv): string[] {
+  // Join with the separator of the platform being probed, not of the machine running the code.
   const game = "World of Warcraft";
   if (platform === "win32") {
     return [env["ProgramFiles(x86)"], env["ProgramFiles"], "C:\\Program Files (x86)", "C:\\Program Files"]
       .filter((p): p is string => !!p)
-      .map((p) => join(p, game));
+      .map((p) => win32.join(p, game));
   }
-  if (platform === "darwin") return [join("/Applications", game)];
+  if (platform === "darwin") return [posix.join("/Applications", game)];
   // WSL can see the Windows install.
   return env["WSL_DISTRO_NAME"]
-    ? [join("/mnt/c/Program Files (x86)", game), join("/mnt/c/Program Files", game)]
+    ? [posix.join("/mnt/c/Program Files (x86)", game), posix.join("/mnt/c/Program Files", game)]
     : [];
 }
 
